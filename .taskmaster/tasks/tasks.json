@@ -5,12 +5,13 @@
         "id": 1,
         "title": "Project Setup and Dependencies",
         "description": "Initialize Python 3.12 project structure with pyproject.toml, install core dependencies (LangGraph, psycopg, ollama-python), and configure development tooling.",
-        "details": "1. Create pyproject.toml with Python 3.12 requirement:\n   - Add langchain, langgraph, langchain-ollama for ReAct agent\n   - Add psycopg[binary] or asyncpg for PostgreSQL\n   - Add python-dotenv for environment config\n   - Add mcp for MCP client integration\n\n2. Create project structure:\n   ```\n   src/\n     ai_agent_hospital/\n       __init__.py\n       agent/          # ReAct agent logic\n       db/             # PostgreSQL thread storage\n       mcp_client/     # MCP communication\n       config.py       # Settings and env vars\n       main.py         # Entry point\n   tests/\n   ```\n\n3. Update .env.example with:\n   - OLLAMA_MODEL (default: llama3.2 or similar)\n   - OLLAMA_BASE_URL (default: http://localhost:11434)\n   - DATABASE_URL (PostgreSQL connection string)\n\n4. Configure ruff/black for linting in pyproject.toml\n5. Add pytest and pytest-asyncio for testing",
+        "details": "1. Create pyproject.toml with Python 3.12 requirement:\n   - Add langchain, langgraph, langchain-ollama for ReAct agent\n   - Add psycopg[binary] or asyncpg for PostgreSQL\n   - Add python-dotenv for environment config\n   - Add mcp for MCP client integration\n\n2. Create project structure:\n   ```\n   src/\n     ai_agent_hospital/\n       __init__.py\n       agent/          # ReAct agent logic\n       db/             # PostgreSQL thread storage\n       mcp_client/     # MCP communication\n       config.py       # Settings and env vars\n       main.py         # Entry point\n   tests/\n   ```\n\n3. Update .env.example with:\n   - OLLAMA_MODEL (default: llama3.2 or similar)\n   - OLLAMA_BASE_URL (default: http://localhost:11434)\n   - DATABASE_URL (PostgreSQL connection string)\n\n4. Configure ruff/black for linting in pyproject.toml\n5. Add pytest and pytest-asyncio for testing\n<info added on 2026-10-26T20:49:12.654Z>\nLet me analyze the current codebase to understand what has been implemented and verify the details mentioned in the user request.Based on my analysis of the codebase, I can now generate the implementation notes text to append to the task details.\n\nImplementation Notes:\n\npyproject.toml configured with uv as package manager and hatchling as build backend, using src layout with Python >=3.12,<3.13 constraint.\n\nDependencies installed:\n- langgraph>=1.2.18 with langchain-ollama>=1.1.0 for ReAct agent\n- langgraph-checkpoint-postgres>=3.2.0 with psycopg[binary,pool]>=3.3.6 for PostgreSQL thread storage\n- langchain-mcp-adapters>=0.3.2 with mcp>=1.30.0 for MCP client integration\n- python-dotenv>=1.2.4 for environment configuration\n- Dev dependencies: pytest>=9.1.1, pytest-asyncio>=1.4.1, ruff>=0.17.2\n\nProject structure created at src/ai_agent_hospital/ with __init__.py files in root, agent/, db/, and mcp_client/ subdirectories. config.py implements Settings dataclass (frozen) with get_settings() function loading OLLAMA_MODEL, OLLAMA_BASE_URL, and DATABASE_URL from environment with defaults. main.py entry point configured as ai-agent-hospital script.\n\nRuff configured in pyproject.toml (line-length=100, target-version=py312, lint rules: E, F, I, UP, B) replacing black for formatting.\n\npytest configured with testpaths=[\"tests\"] and asyncio_mode=\"auto\".\n\n.env.example updated with all three required variables plus PERPLEXITY_API_KEY for Task Master research.\n\n.pre-commit-config.yaml includes: trailing-whitespace, end-of-file-fixer, check-yaml, check-added-large-files hooks, plus local hooks for block-main (prevents direct commits to main/master), ruff-check, ruff-format, and run-tests (all via uv run).\n\n15 tests in tests/test_setup.py covering: Python 3.12 version check, 7 core dependency imports (langgraph.graph, langchain_ollama, langgraph.checkpoint.postgres, langchain_mcp_adapters.client, mcp, psycopg, dotenv), StateGraph import verification, 4 package structure imports (agent, db, mcp_client, main), and 2 config tests (defaults and env override).\n</info added on 2026-10-26T20:49:12.654Z>",
         "testStrategy": "Verify: (1) `uv sync` installs all dependencies without errors, (2) Python 3.12 is enforced, (3) imports work: `from langgraph.graph import StateGraph`, (4) project structure exists with __init__.py files",
         "priority": "high",
         "dependencies": [],
-        "status": "pending",
-        "subtasks": []
+        "status": "in-progress",
+        "subtasks": [],
+        "updatedAt": "2026-10-26T20:45:43.961Z"
       },
       {
         "id": 2,
@@ -20,7 +21,7 @@
         "testStrategy": "Integration tests: (1) Start postgres via docker-compose, (2) Run schema migration, (3) Test CRUD operations: create thread, add messages, retrieve thread history, (4) Verify foreign key constraints work (delete thread cascades to messages)",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "pending",
         "subtasks": []
@@ -33,7 +34,7 @@
         "testStrategy": "Unit tests: (1) Mock Ollama responses for offline testing, (2) Integration test (requires Ollama running): send simple prompt, verify response format, (3) Test connection error handling when Ollama is down",
         "priority": "high",
         "dependencies": [
-          1
+          "1"
         ],
         "status": "pending",
         "subtasks": []
@@ -44,7 +45,7 @@
         "description": "Implement MCP client that connects to the external smart_hospitals MCP server via stdio for retrieving dengue data from São Paulo.",
         "status": "pending",
         "dependencies": [
-          1
+          "1"
         ],
         "priority": "high",
         "details": "**SCOPE CHANGE**: The MCP server is NOT created in this repo. It is the external server from the smart_hospitals project (FastMCP, stdio, managed with uv). Integration testing with the real server is handled in task 5.\n\n## 1. Create src/ai_agent_hospital/mcp_client/client.py\n\nUse the mcp Python package (pip install mcp) and implement DengueMCPClient class:\n\n```python\nimport os\nimport shlex\nfrom pathlib import Path\nfrom mcp import StdioServerParameters, stdio_client\nfrom mcp.client.session import ClientSession\n\nclass MCPConnectionError(Exception):\n    \"\"\"Raised when MCP server connection fails.\"\"\"\n    pass\n\nclass DengueMCPClient:\n    def __init__(self, server_command: str, server_args: str, smart_hospitals_path: str | None = None):\n        \"\"\"\n        Args:\n            server_command: Command to run (e.g., 'uv')\n            server_args: Arguments string (e.g., 'run --directory ${SMART_HOSPITALS_PATH} dengue-mcp')\n            smart_hospitals_path: Path to smart_hospitals repo for variable expansion\n        \"\"\"\n        # Expand ${SMART_HOSPITALS_PATH} in args\n        if smart_hospitals_path:\n            server_args = server_args.replace('${SMART_HOSPITALS_PATH}', smart_hospitals_path)\n        \n        # Parse args string into list using shlex\n        args_list = shlex.split(server_args)\n        \n        # Validate command and directory exist\n        self._validate_config(server_command, smart_hospitals_path)\n        \n        # Set cwd and env for StdioServerParameters so uv works correctly\n        self.server_params = StdioServerParameters(\n            command=server_command,\n            args=args_list,\n            cwd=smart_hospitals_path,  # Set working directory\n            env={**os.environ, 'SMART_HOSPITALS_PATH': smart_hospitals_path or ''}\n        )\n        self._session: ClientSession | None = None\n    \n    def _validate_config(self, command: str, path: str | None) -> None:\n        \"\"\"Validate command exists and directory is valid.\"\"\"\n        import shutil\n        if not shutil.which(command):\n            raise MCPConnectionError(\n                f\"Command '{command}' not found. Ensure uv is installed: curl -LsSf https://astral.sh/uv/install.sh | sh\"\n            )\n        if path and not Path(path).is_dir():\n            raise MCPConnectionError(\n                f\"Directory not found: {path}. Set SMART_HOSPITALS_PATH to the cloned smart_hospitals repo.\"\n            )\n    \n    async def connect(self) -> ClientSession:\n        \"\"\"Initialize stdio transport and create session.\"\"\"\n        # Implementation using stdio_client context manager\n    \n    async def list_tools(self) -> list:\n        \"\"\"Get available tools from MCP server dynamically.\"\"\"\n        # Returns list of Tool objects with name, description, inputSchema\n    \n    async def call_tool(self, name: str, arguments: dict) -> Any:\n        \"\"\"Execute tool and return result.\"\"\"\n    \n    async def close(self) -> None:\n        \"\"\"Graceful connection cleanup.\"\"\"\n```\n\n## 2. Create src/ai_agent_hospital/mcp_client/tools.py\n\nDynamically convert MCP tools to LangChain StructuredTool based on inputSchema (no hardcoded tool names):\n\n```python\nfrom langchain_core.tools import StructuredTool\nfrom pydantic import create_model\nfrom typing import Any\n\ndef mcp_tools_to_langchain(mcp_client: DengueMCPClient) -> list[StructuredTool]:\n    \"\"\"\n    Convert MCP tool definitions to LangChain StructuredTool.\n    Tools are discovered dynamically via list_tools() - no hardcoded names.\n    \"\"\"\n    tools = []\n    mcp_tools = await mcp_client.list_tools()\n    \n    for tool in mcp_tools:\n        # Build Pydantic model from inputSchema\n        args_schema = _schema_to_pydantic(tool.name, tool.inputSchema)\n        \n        # Create async wrapper that calls mcp_client.call_tool\n        async def _invoke(tool_name=tool.name, **kwargs) -> Any:\n            return await mcp_client.call_tool(tool_name, kwargs)\n        \n        structured_tool = StructuredTool.from_function(\n            func=_invoke,\n            name=tool.name,\n            description=tool.description,\n            args_schema=args_schema,\n            coroutine=_invoke\n        )\n        tools.append(structured_tool)\n    \n    return tools\n\ndef _schema_to_pydantic(name: str, schema: dict) -> type:\n    \"\"\"Convert JSON Schema to Pydantic model for StructuredTool args.\"\"\"\n    # Handle properties, required fields, and types from inputSchema\n    # Return dynamically created Pydantic model\n```\n\n## 3. Update .env.example\n\nAdd MCP server configuration (remove any path/to/mcp_server.py examples):\n\n```bash\n# External MCP Server (smart_hospitals project)\n# Clone from: https://github.com/kajus9138/smart_hospitals\nSMART_HOSPITALS_PATH=/path/to/smart_hospitals\nMCP_SERVER_COMMAND=uv\nMCP_SERVER_ARGS=run --directory ${SMART_HOSPITALS_PATH} dengue-mcp\n```\n\n## 4. Update config.py (from task 1)\n\nAdd settings for MCP configuration:\n\n```python\nclass Settings(BaseSettings):\n    # ... existing settings ...\n    SMART_HOSPITALS_PATH: str | None = None\n    MCP_SERVER_COMMAND: str = 'uv'\n    MCP_SERVER_ARGS: str = 'run --directory ${SMART_HOSPITALS_PATH} dengue-mcp'\n```\n\n## 5. Implement graceful connection handling\n\n- Context manager support (`async with client:` pattern)\n- Automatic reconnection logic with exponential backoff\n- Clear error messages with actionable suggestions\n\n## Real Tools Available (for mock data in unit tests)\n\nThe smart_hospitals MCP server provides these 4 tools:\n1. **situacao_atual()** - No parameters, returns current dengue situation\n2. **tendencia(semanas: int = 4)** - Returns trend for last N weeks (range 1-52)\n3. **serie_historica(inicio: str, fim: str)** - Returns weekly series (format YYYYWW or YYYY-MM-DD)\n4. **comparativo_sazonal(semana: int | None = None)** - Compares week vs previous years (range 1-53 or None)",
@@ -57,7 +58,8 @@
             "dependencies": [],
             "details": "Create src/ai_agent_hospital/mcp_client/__init__.py and src/ai_agent_hospital/mcp_client/client.py with:\n- MCPConnectionError exception class with clear error messages\n- DengueMCPClient.__init__ with shlex.split for args parsing\n- Environment variable expansion (${SMART_HOSPITALS_PATH})\n- _validate_config method checking command exists (shutil.which) and directory exists (Path.is_dir)\n- StdioServerParameters construction with cwd and env",
             "status": "pending",
-            "testStrategy": "Unit tests for args parsing, env expansion, and validation errors with mocked shutil.which and Path"
+            "testStrategy": "Unit tests for args parsing, env expansion, and validation errors with mocked shutil.which and Path",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -68,7 +70,8 @@
             ],
             "details": "Implement in client.py:\n- connect() using mcp.stdio_client context manager\n- list_tools() returning dynamic tool list from server\n- call_tool(name, arguments) executing tools and returning results\n- close() for graceful cleanup\n- __aenter__/__aexit__ for async context manager pattern\n- Reconnection logic with exponential backoff on transient failures",
             "status": "pending",
-            "testStrategy": "Unit tests with mocked stdio_client and ClientSession, test reconnection logic"
+            "testStrategy": "Unit tests with mocked stdio_client and ClientSession, test reconnection logic",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -79,7 +82,8 @@
             ],
             "details": "Create src/ai_agent_hospital/mcp_client/tools.py with:\n- mcp_tools_to_langchain(mcp_client) async function\n- _schema_to_pydantic(name, schema) helper using pydantic.create_model\n- Handle JSON Schema types (string, integer, null, arrays) to Python types\n- Handle required vs optional fields and defaults\n- Create async wrapper functions that call mcp_client.call_tool\n- No hardcoded tool names - fully dynamic discovery",
             "status": "pending",
-            "testStrategy": "Test with mock tools having various inputSchema patterns, verify StructuredTool has correct args_schema"
+            "testStrategy": "Test with mock tools having various inputSchema patterns, verify StructuredTool has correct args_schema",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -88,7 +92,8 @@
             "dependencies": [],
             "details": "Update .env.example with documented MCP settings:\n- SMART_HOSPITALS_PATH with comment about cloning smart_hospitals repo\n- MCP_SERVER_COMMAND=uv\n- MCP_SERVER_ARGS=run --directory ${SMART_HOSPITALS_PATH} dengue-mcp\n\nUpdate config.py (task 1) Settings class to include these with appropriate types and defaults",
             "status": "pending",
-            "testStrategy": "Verify .env.example has correct format and config.py loads settings correctly"
+            "testStrategy": "Verify .env.example has correct format and config.py loads settings correctly",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -99,7 +104,8 @@
             ],
             "details": "Create tests/unit/test_mcp_client.py with:\n- MOCK_TOOLS fixture with 4 dengue tools and their inputSchema\n- test_connection_establishment with mocked stdio_client\n- test_tool_listing with mocked session.list_tools\n- test_tool_invocation with sample response data\n- test_mcp_to_langchain_conversion verifying StructuredTool creation\n- test_invalid_command_error and test_invalid_directory_error\n- test_args_parsing and test_env_variable_expansion\n\nUse pytest-asyncio for async tests and unittest.mock for mocking",
             "status": "pending",
-            "testStrategy": "Run pytest tests/unit/test_mcp_client.py, all tests should pass without external dependencies"
+            "testStrategy": "Run pytest tests/unit/test_mcp_client.py, all tests should pass without external dependencies",
+            "parentId": "undefined"
           }
         ]
       },
@@ -109,8 +115,8 @@
         "description": "Configure connection to the external dengue MCP server from the smart_hospitals project (github.com/kajus9138/smart_hospitals) and validate the integration with the MCP client from task 4.",
         "status": "pending",
         "dependencies": [
-          1,
-          4
+          "1",
+          "4"
         ],
         "priority": "high",
         "details": "**SCOPE CHANGE**: This project does NOT create its own MCP server. It connects to an existing MCP server in the smart_hospitals project.\n\n## External MCP Server Details\n- **Repository**: github.com/kajus9138/smart_hospitals\n- **Local path**: /home/ksilva/Documents/SLM_Healthcare/smart_hospitals\n- **Technology**: FastMCP (mcp[cli]>=2.3), stdio transport, managed with uv\n- **Start command**: `uv run --directory ${SMART_HOSPITALS_PATH} dengue-mcp`\n- **Alternative**: `python -m smart_hospitals.mcp_server`\n- **Data source**: InfoDengue snapshot for São Paulo capital (data/dengue_sp_snapshot.csv)\n\n## Available Tools (4 total - discovered dynamically via list_tools())\n1. **situacao_atual()** - Current dengue situation\n2. **tendencia(semanas: int = 4)** - Trend indicators for last N weeks\n3. **serie_historica(inicio, fim)** - Historical weekly series\n4. **comparativo_sazonal(semana: int | None)** - Seasonal comparison with previous years\n\n**NOTE**: There are NO hospital capacity tools or region/district tools - only epidemiological dengue data.\n**NOTE**: Tool schemas and return fields are discovered dynamically via list_tools() from the MCP client (task 4). No hardcoded tool definitions in this repo.\n\n## Implementation Steps\n\n### 1. Environment Configuration\nUpdate `.env.example` with:\n```bash\n# External MCP Server (smart_hospitals project)\nSMART_HOSPITALS_PATH=/path/to/smart_hospitals\nMCP_SERVER_COMMAND=uv\nMCP_SERVER_ARGS=run --directory ${SMART_HOSPITALS_PATH} dengue-mcp\n```\n\n### 2. Prerequisites Documentation\nCreate documentation/script for prerequisites:\n- Clone smart_hospitals repo: `git clone github.com/kajus9138/smart_hospitals`\n- Install dependencies: `cd smart_hospitals && uv sync`\n- Verify data file exists: `smart_hospitals/data/dengue_sp_snapshot.csv`\n\n### 3. Smoke Test Integration\nUsing the MCP client from task 4:\n- Connect via stdio with configured command\n- List tools dynamically via list_tools() and verify exactly 4 tools are available\n- Verify tool names match: situacao_atual, tendencia, serie_historica, comparativo_sazonal\n\n### 4. Cleanup\n- Do NOT create any `mcp_server/` directory in this repo\n- Do NOT create mock data files\n- Do NOT create hardcoded tool definition files (tools are discovered dynamically)\n- Remove any references to local MCP server creation from related documentation",
@@ -123,7 +129,8 @@
             "dependencies": [],
             "details": "Add to .env.example:\n- SMART_HOSPITALS_PATH: path to the cloned smart_hospitals repository\n- MCP_SERVER_COMMAND: 'uv' (the command to run the server)\n- MCP_SERVER_ARGS: 'run --directory ${SMART_HOSPITALS_PATH} dengue-mcp'\n\nUpdate config.py in task 1 to read these variables with appropriate defaults and validation.",
             "status": "pending",
-            "testStrategy": "Verify .env.example contains all required variables with descriptive comments"
+            "testStrategy": "Verify .env.example contains all required variables with descriptive comments",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -134,7 +141,8 @@
             ],
             "details": "Add to README.md a 'Prerequisites' section explaining:\n1. Clone the smart_hospitals repo: `git clone https://github.com/kajus9138/smart_hospitals.git`\n2. Navigate and install: `cd smart_hospitals && uv sync`\n3. Set SMART_HOSPITALS_PATH in .env to the cloned path\n4. Verify InfoDengue data exists at data/dengue_sp_snapshot.csv\n\nOptionally create a scripts/setup-smart-hospitals.sh helper script.",
             "status": "pending",
-            "testStrategy": "Follow documentation on a clean setup to verify steps are complete and accurate"
+            "testStrategy": "Follow documentation on a clean setup to verify steps are complete and accurate",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -145,7 +153,8 @@
             ],
             "details": "Create tests/integration/test_dengue_mcp_integration.py:\n- Use pytest fixture to establish connection using MCP client from task 4\n- Mark with @pytest.mark.integration\n- Skip if SMART_HOSPITALS_PATH not set\n- Test: connect, call list_tools() dynamically, assert len(tools) == 4\n- Verify tool names: situacao_atual, tendencia, serie_historica, comparativo_sazonal\n- Do NOT hardcode tool schemas - use the schemas returned by list_tools()",
             "status": "pending",
-            "testStrategy": "Run pytest with integration marker when smart_hospitals is available"
+            "testStrategy": "Run pytest with integration marker when smart_hospitals is available",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -156,7 +165,8 @@
             ],
             "details": "In tests/integration/test_dengue_mcp_integration.py:\n- test_situacao_atual: call tool via MCP client, verify response is returned successfully\n- test_tendencia: call tendencia(semanas=4), verify response structure\n- Use schemas from list_tools() for validation rather than hardcoded field expectations\n- Validate that responses are well-formed according to their dynamic schemas",
             "status": "pending",
-            "testStrategy": "Run integration tests and verify actual responses are returned successfully"
+            "testStrategy": "Run integration tests and verify actual responses are returned successfully",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -167,18 +177,19 @@
             ],
             "details": "Add tests:\n- test_invalid_path: Set invalid SMART_HOSPITALS_PATH, attempt connection, verify MCPConnectionError or similar with helpful message\n- test_server_not_found: Use nonexistent command, verify error handling\n- Ensure errors are user-friendly and suggest how to fix (check path, run uv sync, etc.)",
             "status": "pending",
-            "testStrategy": "Run tests with intentionally invalid configurations and verify error messages"
+            "testStrategy": "Run tests with intentionally invalid configurations and verify error messages",
+            "parentId": "undefined"
           }
         ]
       },
       {
-        "id": "6",
+        "id": 6,
         "title": "ReAct Agent with LangGraph",
         "description": "Implement the ReAct (Reasoning + Acting) agent using LangGraph with tool execution capabilities, integrating with the external smart_hospitals MCP server tools for dengue epidemiological data.",
         "status": "pending",
         "dependencies": [
-          3,
-          4
+          "3",
+          "4"
         ],
         "priority": "high",
         "details": "**IMPORTANT**: Before implementing, use Context7 to verify the current LangGraph `create_react_agent` API. The parameter for system prompts may have changed from `state_modifier` to `prompt`. Query: \"LangGraph create_react_agent prompt parameter\" to confirm the correct signature.\n\n1. Create src/ai_agent_hospital/agent/react_agent.py:\n   ```python\n   from langgraph.prebuilt import create_react_agent\n   from langgraph.checkpoint.postgres import PostgresSaver\n   from langchain_core.messages import HumanMessage\n   \n   class HospitalReActAgent:\n       def __init__(self, llm, tools: list, checkpointer, system_prompt: str = None):\n           # NOTE: Verify via Context7 if state_modifier or prompt is the correct parameter\n           self.graph = create_react_agent(\n               model=llm,\n               tools=tools,\n               checkpointer=checkpointer,\n               state_modifier=system_prompt  # or prompt= depending on API version\n           )\n       \n       async def invoke(self, message: str, thread_id: str) -> str:\n           config = {'configurable': {'thread_id': thread_id}}\n           result = await self.graph.ainvoke(\n               {'messages': [HumanMessage(content=message)]},\n               config=config\n           )\n           return result['messages'][-1].content\n   ```\n\n2. Create agent/prompts.py with simplified system prompt in Portuguese:\n   ```python\n   HOSPITAL_SYSTEM_PROMPT = '''\n   Você é um assistente de apoio à decisão para hospitais inteligentes em São Paulo.\n   Você ajuda gestores e tomadores de decisão a monitorar a situação epidemiológica da dengue\n   e antecipar demandas no sistema de saúde.\n   \n   ## Escopo dos Dados\n   Os dados disponíveis são indicadores epidemiológicos de dengue do município de São Paulo\n   como um todo, provenientes do InfoDengue. Os dados incluem casos notificados, casos estimados,\n   incidência, tendências e comparativos sazonais.\n   \n   **Indisponível:**\n   - Dados de capacidade hospitalar, leitos ou ocupação\n   - Recorte por bairro, distrito, zona ou região\n   - Dados de outros municípios além de São Paulo capital\n   - Recursos humanos ou insumos hospitalares\n   \n   ## Orientações de Uso\n   1. Sempre cite a data ou semana epidemiológica de referência retornada pelas ferramentas ao apresentar dados.\n   2. Ao fazer recomendações (ex: reforçar triagem, antecipar estoques), baseie-se nos indicadores\n      retornados e explicite o raciocínio.\n   3. Quando o usuário perguntar sobre algo FORA do escopo dos dados disponíveis, informe claramente\n      que essa informação não está disponível. NUNCA invente dados.\n   4. Responda sempre em português.\n   5. Raciocine passo a passo antes de executar ações.\n   '''\n   ```\n   \n   **Note**: Tool descriptions and parameters are NOT included in the prompt because they are discovered dynamically via `list_tools()` from the MCP client (task 4) and passed to `create_react_agent`. The LLM receives tool schemas automatically, so duplicating them in the prompt would be redundant and could become outdated.\n\n3. Implement LangGraph state with PostgreSQL checkpointer:\n   - Use langgraph.checkpoint.postgres.PostgresSaver\n   - Configure async connection from existing pool (task 2)\n   - Pass system prompt via state_modifier or prompt parameter (verify with Context7)\n\n4. Add streaming support for real-time output:\n   ```python\n   async def stream(self, message: str, thread_id: str):\n       config = {'configurable': {'thread_id': thread_id}}\n       async for event in self.graph.astream_events(\n           {'messages': [HumanMessage(content=message)]},\n           config=config,\n           version='v2'\n       ):\n           yield event\n   ```\n\n5. Integration with MCP tools from task 4:\n   - Receive tools list from mcp_tools_to_langchain() (task 4.3)\n   - Tools are discovered dynamically, no hardcoded tool names in agent code\n   - System prompt does NOT describe tools (they come from MCP server schemas)\n\n**Note**: The tools come from the external smart_hospitals MCP server (task 5) and are converted to LangChain StructuredTools by the MCP client (task 4). This task focuses on the ReAct agent logic, not tool implementation.",
@@ -191,7 +202,8 @@
             "dependencies": [],
             "details": "**PREREQUISITE**: Use Context7 to query \"LangGraph create_react_agent prompt parameter\" to confirm whether `state_modifier` or `prompt` is the correct parameter for system prompts in the current API version.\n\nCreate src/ai_agent_hospital/agent/react_agent.py with HospitalReActAgent class:\n- __init__ accepting llm, tools list, checkpointer, and optional system_prompt\n- Use create_react_agent with the correct parameter for system prompt (verify via Context7)\n- Implement async invoke(message, thread_id) returning final assistant message\n- Implement async stream(message, thread_id) yielding events for real-time output\n- Handle thread configuration via {'configurable': {'thread_id': thread_id}}",
             "status": "pending",
-            "testStrategy": "Unit test with mock LLM and tools, verify agent creation and invoke returns expected structure"
+            "testStrategy": "Unit test with mock LLM and tools, verify agent creation and invoke returns expected structure",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -200,7 +212,8 @@
             "dependencies": [],
             "details": "Create src/ai_agent_hospital/agent/prompts.py with:\n- HOSPITAL_SYSTEM_PROMPT in Portuguese\n- Define the agent's role: decision support assistant for smart hospitals in São Paulo, monitoring dengue epidemiology\n- Data scope: epidemiological indicators for São Paulo municipality (capital) from InfoDengue\n- Clearly state what is NOT available: regional data (bairro/zona), hospital capacity/beds, other municipalities\n- Usage guidelines: cite reference dates from tools, base recommendations on returned indicators, acknowledge limitations when asked about unavailable data, never invent data, respond in Portuguese\n\n**DO NOT include**: Tool names, parameters, descriptions, or any fixed tool documentation. Tools are discovered dynamically via MCP and their schemas are passed to the LLM automatically by create_react_agent.",
             "status": "pending",
-            "testStrategy": "Review prompt content for: (1) no tool names/parameters present, (2) clear scope definition, (3) proper Portuguese language, (4) explicit data limitations"
+            "testStrategy": "Review prompt content for: (1) no tool names/parameters present, (2) clear scope definition, (3) proper Portuguese language, (4) explicit data limitations",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -211,7 +224,8 @@
             ],
             "details": "Create src/ai_agent_hospital/agent/checkpointer.py:\n- Import AsyncPostgresSaver from langgraph.checkpoint.postgres.aio\n- Implement get_checkpointer(conn_string) async function\n- Call checkpointer.setup() to create required tables\n- Integrate with HospitalReActAgent initialization\n- Handle connection errors gracefully with clear messages",
             "status": "pending",
-            "testStrategy": "Integration test: create checkpointer, invoke agent, restart, verify conversation continues from previous state"
+            "testStrategy": "Integration test: create checkpointer, invoke agent, restart, verify conversation continues from previous state",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -224,7 +238,8 @@
             ],
             "details": "Create factory function in react_agent.py or separate module:\n```python\nasync def create_hospital_agent(\n    llm,\n    mcp_client: DengueMCPClient,\n    checkpointer: AsyncPostgresSaver\n) -> HospitalReActAgent:\n    tools = await mcp_tools_to_langchain(mcp_client)\n    return HospitalReActAgent(\n        llm=llm,\n        tools=tools,\n        checkpointer=checkpointer,\n        system_prompt=HOSPITAL_SYSTEM_PROMPT\n    )\n```\n- Tools are discovered dynamically from MCP server via task 4\n- No hardcoded tool names in agent code\n- System prompt provides context but NOT tool descriptions (those come from MCP schemas)",
             "status": "pending",
-            "testStrategy": "Integration test: create agent with real MCP client, verify tools are available to the agent (count may vary as MCP server evolves)"
+            "testStrategy": "Integration test: create agent with real MCP client, verify tools are available to the agent (count may vary as MCP server evolves)",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -236,7 +251,8 @@
             ],
             "details": "Create tests/unit/test_react_agent.py:\n- test_agent_creation: mock all dependencies, verify graph is created\n- test_invoke_returns_response: mock LLM response, verify message extraction\n- test_system_prompt_included: verify prompt is passed to create_react_agent\n- test_thread_id_configuration: verify config is constructed correctly\n- test_stream_yields_events: mock astream_events, verify generator behavior\n\nUse pytest-asyncio and unittest.mock for async mocking",
             "status": "pending",
-            "testStrategy": "Run pytest tests/unit/test_react_agent.py, all tests pass without external dependencies"
+            "testStrategy": "Run pytest tests/unit/test_react_agent.py, all tests pass without external dependencies",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -248,7 +264,8 @@
             ],
             "details": "Create tests/integration/test_react_agent_integration.py (marked @pytest.mark.integration):\n- test_situacao_atual_query: \"Como está a dengue esta semana?\" - verify tool call and response\n- test_tendencia_query: \"A tendência é de alta?\" - verify appropriate tool usage\n- test_comparativo_query: \"Como se compara com 2024?\" - verify seasonal comparison tool\n- test_out_of_scope_hospital: \"Quantos leitos disponíveis?\" - verify agent acknowledges limitation\n- test_out_of_scope_regional: \"Dengue na Zona Leste?\" - verify agent explains no regional data\n\nSkip if SMART_HOSPITALS_PATH not set",
             "status": "pending",
-            "testStrategy": "Run integration tests with real MCP server connection, verify agent behavior matches expectations"
+            "testStrategy": "Run integration tests with real MCP server connection, verify agent behavior matches expectations",
+            "parentId": "undefined"
           }
         ]
       },
@@ -260,8 +277,8 @@
         "testStrategy": "(1) Test thread creation and ID generation, (2) Test conversation persistence across agent restarts, (3) Test history retrieval returns all messages in order, (4) Test thread deletion cleans up all related data",
         "priority": "medium",
         "dependencies": [
-          2,
-          6
+          "2",
+          "6"
         ],
         "status": "pending",
         "subtasks": []
@@ -274,8 +291,8 @@
         "testStrategy": "(1) Test CLI commands parse correctly, (2) Test chat loop handles input/output, (3) Test thread listing displays correctly, (4) Manual testing: run interactive session with real agent",
         "priority": "medium",
         "dependencies": [
-          6,
-          7
+          "6",
+          "7"
         ],
         "status": "pending",
         "subtasks": []
@@ -288,8 +305,8 @@
         "testStrategy": "(1) Integration test: start all services, run end-to-end conversation, (2) Test each error type is raised correctly, (3) Test retry logic with flaky mock services, (4) Test graceful shutdown closes all connections",
         "priority": "medium",
         "dependencies": [
-          5,
-          8
+          "5",
+          "8"
         ],
         "status": "pending",
         "subtasks": []
@@ -300,7 +317,7 @@
         "description": "Create comprehensive documentation covering setup, configuration, usage, and architecture for the POC demonstration, including integration with the external smart_hospitals MCP server.",
         "status": "pending",
         "dependencies": [
-          9
+          "9"
         ],
         "priority": "medium",
         "details": "1. Update README.md with:\n   - Project overview and architecture diagram showing the external MCP server integration\n   - Prerequisites (Python 3.12, Ollama, PostgreSQL, smart_hospitals repository)\n   - Quick start guide:\n     ```bash\n     # Clone external MCP server\n     git clone https://github.com/kajus9138/smart_hospitals.git\n     cd smart_hospitals && uv sync && cd ..\n     \n     docker-compose up -d  # Start PostgreSQL\n     ollama pull llama3.2  # Download model\n     uv sync               # Install dependencies\n     \n     # Configure MCP server path\n     export SMART_HOSPITALS_PATH=/path/to/smart_hospitals\n     \n     hospital-agent chat   # Start chatting\n     ```\n   - Configuration options (all env vars including SMART_HOSPITALS_PATH, MCP_SERVER_COMMAND, MCP_SERVER_ARGS)\n   - Example interactions aligned with available tools:\n     - Querying current dengue situation (situacao_atual)\n     - Analyzing epidemiological trends (tendencia)\n     - Viewing historical time series (serie_historica)\n     - Comparing seasonal patterns (comparativo_sazonal)\n\n2. Create docs/architecture.md:\n   - Component diagram showing:\n     - Agent -> LLM (Ollama local)\n     - Agent -> MCP Client -> External MCP Server (smart_hospitals, child process via stdio)\n     - Agent -> DB (PostgreSQL for thread persistence)\n   - Mark MCP server as external system (separate repository, child process via stdio)\n   - Data flow for ReAct loop with tool calls to external MCP server\n   - Thread persistence model\n\n3. Create docs/mcp-integration.md (replaces mcp-server.md):\n   - Prerequisites:\n     - Clone smart_hospitals repository: `git clone https://github.com/kajus9138/smart_hospitals.git`\n     - Install dependencies: `cd smart_hospitals && uv sync`\n   - Environment variables:\n     - SMART_HOSPITALS_PATH: Path to smart_hospitals repository\n     - MCP_SERVER_COMMAND: Command to start server (default: `uv`)\n     - MCP_SERVER_ARGS: Arguments for server command (default: `run --directory {path} dengue-mcp`)\n   - Available tools (link to smart_hospitals README as source of truth):\n     - situacao_atual: Current epidemiological situation\n     - tendencia: Trend analysis over configurable weeks\n     - serie_historica: Historical time series data\n     - comparativo_sazonal: Seasonal comparison analysis\n   - How to update the data snapshot in smart_hospitals\n   - Troubleshooting stdio connection issues (process spawn, env vars, path validation)\n\n4. Add inline docstrings to all public functions\n\n5. Create DEMO.md with:\n   - Sample conversation script for POC presentation\n   - Examples aligned with the 4 available tools:\n     - Querying current dengue situation (situacao_atual)\n     - Asking about epidemiological trends (tendencia)\n     - Requesting historical data series (serie_historica)\n     - Comparing with previous seasons (comparativo_sazonal)\n   - Multi-turn reasoning conversation demonstrating ReAct loop\n\n6. Update .taskmaster/docs/prd.txt acceptance criteria status",
@@ -313,7 +330,8 @@
             "dependencies": [],
             "details": "Update /home/ksilva/Documents/ai_agent_hospital/README.md:\n- Project overview explaining ReAct agent for hospital decision support\n- Architecture diagram showing Agent -> Ollama LLM, Agent -> External MCP Server (smart_hospitals via stdio), Agent -> PostgreSQL\n- Prerequisites section listing all required software\n- Quick start with commands for cloning smart_hospitals, docker-compose, ollama pull, uv sync, and env vars\n- Configuration section documenting SMART_HOSPITALS_PATH, MCP_SERVER_COMMAND, MCP_SERVER_ARGS, DATABASE_URL, OLLAMA_MODEL",
             "status": "pending",
-            "testStrategy": "Follow quick start guide on clean environment, verify all commands execute successfully"
+            "testStrategy": "Follow quick start guide on clean environment, verify all commands execute successfully",
+            "parentId": "undefined"
           },
           {
             "id": 2,
@@ -322,7 +340,8 @@
             "dependencies": [],
             "details": "Create /home/ksilva/Documents/ai_agent_hospital/docs/architecture.md:\n- Component diagram with:\n  - ai_agent_hospital (this repo): ReAct Agent, MCP Client, DB connector\n  - Ollama (local LLM service)\n  - smart_hospitals MCP Server (external, child process via stdio, separate repository)\n  - PostgreSQL (thread persistence)\n- Data flow diagram for ReAct loop:\n  - User input -> Agent -> LLM reasoning -> Tool selection -> MCP Client -> stdio -> External MCP Server -> Response -> Agent -> LLM -> User output\n- Thread persistence model: how conversations are stored and retrieved",
             "status": "pending",
-            "testStrategy": "Review diagrams for accuracy against actual implementation in tasks 4-7"
+            "testStrategy": "Review diagrams for accuracy against actual implementation in tasks 4-7",
+            "parentId": "undefined"
           },
           {
             "id": 3,
@@ -331,7 +350,8 @@
             "dependencies": [],
             "details": "Create /home/ksilva/Documents/ai_agent_hospital/docs/mcp-integration.md:\n- Prerequisites: git clone smart_hospitals, uv sync in that repo\n- Environment variables: SMART_HOSPITALS_PATH (required), MCP_SERVER_COMMAND (default: uv), MCP_SERVER_ARGS (default: run --directory {path} dengue-mcp)\n- Available tools section with link to smart_hospitals README:\n  - situacao_atual: returns current epidemiological data (casos, incidencia, nivel_alerta, Rt, etc.)\n  - tendencia: trend analysis with configurable weeks parameter\n  - serie_historica: historical time series data\n  - comparativo_sazonal: seasonal comparison analysis\n- How to update data: instructions for updating snapshot in smart_hospitals repo\n- Troubleshooting: common stdio connection issues, path validation, process spawn errors, environment variable problems",
             "status": "pending",
-            "testStrategy": "Follow setup instructions and verify MCP connection works, test each troubleshooting scenario"
+            "testStrategy": "Follow setup instructions and verify MCP connection works, test each troubleshooting scenario",
+            "parentId": "undefined"
           },
           {
             "id": 4,
@@ -340,7 +360,8 @@
             "dependencies": [],
             "details": "Review all Python files in src/ai_agent_hospital/ and add docstrings:\n- Use Google or NumPy docstring style consistently\n- Document parameters, return values, and exceptions\n- Include usage examples where helpful\n- Focus on public API functions in: agent/, mcp_client/, db/, cli.py, config.py",
             "status": "pending",
-            "testStrategy": "Run pydocstyle or similar tool to verify docstring coverage and format"
+            "testStrategy": "Run pydocstyle or similar tool to verify docstring coverage and format",
+            "parentId": "undefined"
           },
           {
             "id": 5,
@@ -349,7 +370,8 @@
             "dependencies": [],
             "details": "Create /home/ksilva/Documents/ai_agent_hospital/DEMO.md:\n- Introduction for POC presentation context\n- Sample conversation 1: Querying current situation\n  - User: 'Qual a situação atual da dengue em São Paulo?'\n  - Agent uses situacao_atual tool, explains casos, incidencia, nivel_alerta\n- Sample conversation 2: Trend analysis\n  - User: 'Como está a tendência nas últimas 4 semanas?'\n  - Agent uses tendencia tool, explains weekly progression\n- Sample conversation 3: Historical data\n  - User: 'Mostre a série histórica dos últimos meses'\n  - Agent uses serie_historica tool\n- Sample conversation 4: Seasonal comparison\n  - User: 'Como este ano se compara ao mesmo período do ano passado?'\n  - Agent uses comparativo_sazonal tool\n- Multi-turn reasoning example showing ReAct loop in action",
             "status": "pending",
-            "testStrategy": "Run each sample conversation through the agent and verify expected tool calls and responses"
+            "testStrategy": "Run each sample conversation through the agent and verify expected tool calls and responses",
+            "parentId": "undefined"
           },
           {
             "id": 6,
@@ -364,14 +386,21 @@
             ],
             "details": "Review /home/ksilva/Documents/ai_agent_hospital/.taskmaster/docs/prd.txt:\n- Verify 'O sistema DEVE comunicar-se com o MCP local' is met (via task 5 integration)\n- Verify 'A documentação DEVE estar informativa e organizada' is met (via this task's deliverables)\n- Add a status section to the PRD or create a separate acceptance-criteria.md documenting completion status\n- Include references to specific documentation files and test results that demonstrate criteria are met",
             "status": "pending",
-            "testStrategy": "Review each criterion against implementation and documentation, verify with stakeholder"
+            "testStrategy": "Review each criterion against implementation and documentation, verify with stakeholder",
+            "parentId": "undefined"
           }
         ]
       }
     ],
     "metadata": {
-      "created": "2026-10-26T19:32:03.313Z",
-      "updated": "2026-10-26T19:32:03.313Z",
+      "version": "1.0.0",
+      "lastModified": "2026-10-26T20:45:43.961Z",
+      "taskCount": 10,
+      "completedCount": 0,
+      "tags": [
+        "master"
+      ],
+      "created": "2026-10-26T20:48:45.460Z",
       "description": "Tasks for master context"
     }
   }

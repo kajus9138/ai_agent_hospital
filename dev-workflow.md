@@ -13,7 +13,7 @@ O agente DEVE seguir estas etapas em toda tarefa.
 - Árvore limpa: `git status`
 - Uma branch por tarefa: `git checkout -b feat/<id>-<descricao-curta>` (ou `fix/`, `chore/`)
 - `task-master set-status --id=<id> --status=in-progress`
-- Rodar os testes antes de mexer, para saber o ponto de partida: `<comando-de-teste>`
+- Rodar os testes antes de mexer, para saber o ponto de partida: `uv run pytest`
 
 ## 3. Planejar
 - Apresentar um plano (arquivos afetados, abordagem, testes) e esperar aprovação antes de escrever código.
@@ -24,8 +24,8 @@ O agente DEVE seguir estas etapas em toda tarefa.
 - Registrar o progresso: `task-master update-subtask --id=<id> --prompt="o que funcionou / o que não"`
 
 ## 5. Validar
-- Testes: `<comando-de-teste>`
-- Lint e tipos: `<comando-de-lint>`
+- Testes: `uv run pytest`
+- Lint e tipos: `uv run ruff check . && uv run ruff format --check .`
 - Revisar o diff com `/code-review` antes de commitar.
 
 ## 6. Entregar
@@ -38,14 +38,14 @@ O agente DEVE seguir estas etapas em toda tarefa.
 - `task-master set-status --id=<id> --status=done`
 
 ## Convenções do projeto
-- Linguagem: <preencher>
-- Gestor de pacotes: <preencher>
-- Testes: <preencher>
-- Lint/format: <preencher>
+- Linguagem: Python 3.12
+- Gestor de pacotes: uv (`uv.lock` versionado)
+- Testes: pytest + pytest-asyncio (`tests/`)
+- Lint/format: ruff (`ruff check` + `ruff format`)
 - Commits: Conventional Commits
 
 ## Comandos essenciais
-- Testes: `<comando>`
-- Lint: `<comando>`
-- Formatação: `<comando>`
-- Build: `<comando>`
+- Testes: `uv run pytest`
+- Lint: `uv run ruff check .`
+- Formatação: `uv run ruff format .`
+- Build: `uv build`
