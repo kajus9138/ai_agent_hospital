@@ -14,10 +14,19 @@ repos:
         language: system
         pass_filenames: false
         always_run: true
-      # Descomente quando o projeto tiver testes:
-      # - id: run-tests
-      #   name: Run tests
-      #   entry: <comando-de-teste-do-projeto>
-      #   language: system
-      #   pass_filenames: false
-      #   always_run: true
+      - id: ruff-check
+        name: Ruff (lint)
+        entry: uv run ruff check --force-exclude
+        language: system
+        types: [python]
+      - id: ruff-format
+        name: Ruff (format)
+        entry: uv run ruff format --check --force-exclude
+        language: system
+        types: [python]
+      - id: run-tests
+        name: Run tests
+        entry: uv run pytest -q
+        language: system
+        pass_filenames: false
+        always_run: true

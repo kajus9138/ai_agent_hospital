@@ -32,3 +32,13 @@ dev-workflow-setup-aula-2.pdf
 
 # Task Master: estado local
 .taskmaster/state.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/

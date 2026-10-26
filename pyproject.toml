@@ -1,0 +1,43 @@
+[project]
+name = "ai-agent-hospital"
+version = "0.1.0"
+description = "POC de agente ReAct (LangGraph + Ollama) para tomada de decisão hospitalar, com MCP local via stdio"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "langchain-mcp-adapters>=0.3.2",
+    "langchain-ollama>=1.1.0",
+    "langgraph>=1.2.18",
+    "langgraph-checkpoint-postgres>=3.2.0",
+    "mcp>=1.30.0",
+    "psycopg[binary,pool]>=3.3.6",
+    "python-dotenv>=1.2.4",
+]
+
+[project.scripts]
+ai-agent-hospital = "ai_agent_hospital.main:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/ai_agent_hospital"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "pytest-asyncio>=1.4.1",
+    "ruff>=0.17.2",
+]
