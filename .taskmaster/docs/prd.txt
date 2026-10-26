@@ -1,0 +1,37 @@
+# PRD - <Nome do Projeto>
+## 1. Contexto
+<O que existe hoje? Por que esse projeto precisa existir?
+Qual é o público e por que isso importa agora?>
+## 2. Objetivo
+<Resultado esperado em uma frase única e clara.
+Foque no outcome, não na feature.>
+## 3. Usuário-alvo
+<Quem usará a solução? Qual é a dor concreta que será resolvida?
+Inclua cenários reais quando possível.>
+## 4. Escopo (nesta versão)
+- <Funcionalidade 1>
+- <Funcionalidade 2>
+- <Funcionalidade 3>
+## 5. Fora de escopo (explicitamente)
+- <O que NÃO será feito agora>
+- <O que pode parecer que entra, mas não entra>
+## 6. Requisitos funcionais
+- RF01: <Descrição clara, em forma de comportamento esperado>
+- RF02: <...>
+## 7. Requisitos não funcionais
+- RNF01: Segurança e privacidade (<detalhar>)
+- RNF02: Observabilidade mínima (<logs / métricas>)
+- RNF03: Testabilidade (<cobertura mínima esperada>)
+- RNF04: Performance (<SLAs aplicáveis>)
+## 8. Arquitetura inicial
+<Stack escolhida, módulos previstos, integrações externas,
+decisões já tomadas com justificativa breve.>
+## 9. Critérios de aceite
+- O sistema DEVE <comportamento testável>
+- Os testes DEVEM <cobertura ou cenários específicos>
+- A documentação DEVE <o que precisa estar pronto>
+## 10. Riscos e validações
+<Liste riscos técnicos conhecidos e como cada um será validado.>
+## 11. Premissas
+<Hipóteses assumidas como verdadeiras que, se falsas, mudam o projeto.>
+## 12. Métricas de sucesso

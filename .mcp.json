@@ -1,0 +1,25 @@
+{
+	"mcpServers": {
+		"task-master-ai": {
+			"type": "stdio",
+			"command": "npx",
+			"args": [
+				"-y",
+				"task-master-ai"
+			],
+			"env": {
+				"TASK_MASTER_TOOLS": "core"
+			}
+		},
+		"basic-memory": {
+			"type": "stdio",
+			"command": "uvx",
+			"args": [
+				"basic-memory",
+				"mcp",
+				"--project",
+				"ai_agent_hospital"
+			]
+		}
+	}
+}

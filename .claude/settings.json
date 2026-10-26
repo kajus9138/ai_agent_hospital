@@ -1,0 +1,29 @@
+{
+  "enabledMcpjsonServers": ["task-master-ai", "basic-memory"],
+  "permissions": {
+    "allow": [
+      "Bash(task-master list:*)",
+      "Bash(task-master show:*)",
+      "Bash(task-master next:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "mcp__task-master-ai__get_tasks",
+      "mcp__task-master-ai__get_task",
+      "mcp__task-master-ai__next_task",
+      "mcp__basic-memory__search_notes",
+      "mcp__basic-memory__read_note",
+      "mcp__basic-memory__build_context",
+      "mcp__basic-memory__recent_activity"
+    ],
+    "deny": [
+      "Bash(git commit --no-verify:*)",
+      "Bash(git commit -n:*)",
+      "Bash(git push --force:*)",
+      "Bash(git push -f:*)",
+      "Bash(git push origin main:*)",
+      "Read(./.env)",
+      "Read(./.env.local)"
+    ]
+  }
+}

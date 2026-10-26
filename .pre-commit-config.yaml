@@ -1,0 +1,23 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+  - repo: local
+    hooks:
+      - id: block-main
+        name: Block direct commits to main/master
+        entry: bash -c 'branch=$(git symbolic-ref --short HEAD); if [ "$branch" = "main" ] || [ "$branch" = "master" ]; then echo "❌ Commits diretos na $branch bloqueados. Crie uma feature branch com git checkout -b feature/<nome>"; exit 1; fi'
+        language: system
+        pass_filenames: false
+        always_run: true
+      # Descomente quando o projeto tiver testes:
+      # - id: run-tests
+      #   name: Run tests
+      #   entry: <comando-de-teste-do-projeto>
+      #   language: system
+      #   pass_filenames: false
+      #   always_run: true
