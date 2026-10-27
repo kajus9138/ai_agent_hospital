@@ -5,14 +5,12 @@ sistema, o histórico da thread e o laço pensamento → tool → resultado sem 
 Os testes `integration` usam o PostgreSQL (TEST_DATABASE_URL ou DATABASE_URL) e são pulados sem ele.
 """
 
-import os
 import shlex
 import sys
 import uuid
 from pathlib import Path
 from typing import Any
 
-import psycopg
 import pytest
 from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage, SystemMessage, ToolMessage
@@ -20,7 +18,6 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 from langchain_core.tools import tool
 from langgraph.checkpoint.memory import InMemorySaver
 
-from ai_agent_hospital import config
 from ai_agent_hospital.agent.checkpointer import CheckpointerError, open_checkpointer
 from ai_agent_hospital.agent.prompts import HOSPITAL_SYSTEM_PROMPT
 from ai_agent_hospital.agent.react_agent import HospitalReActAgent, create_hospital_agent
@@ -135,17 +132,6 @@ async def test_checkpointer_unreachable_raises_clear_error():
     with pytest.raises(CheckpointerError, match="DATABASE_URL"):
         async with open_checkpointer("postgresql://u:p@127.0.0.1:1/x", connect_timeout=1):
             pass
-
-
-@pytest.fixture
-async def database_url():
-    url = os.getenv("TEST_DATABASE_URL") or config.get_settings().database_url
-    try:
-        conn = await psycopg.AsyncConnection.connect(url, connect_timeout=2)
-    except psycopg.OperationalError as exc:
-        pytest.skip(f"PostgreSQL indisponível: {exc}")
-    await conn.close()
-    return url
 
 
 @pytest.mark.integration

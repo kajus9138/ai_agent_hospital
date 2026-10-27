@@ -116,6 +116,33 @@ async with DengueMCPClient.from_settings() as client, open_checkpointer() as che
         ...  # eventos do astream_events (v2): tokens do modelo, início/fim de tools
 ```
 
+### Threads
+
+`ThreadManager` junta o catálogo (`threads`/`messages`) e o checkpointer: o UUID da thread no
+catálogo é o `thread_id` do grafo, e a tabela `messages` espelha o estado do grafo na mesma ordem.
+
+```python
+from ai_agent_hospital.agent.thread_manager import ThreadManager
+from ai_agent_hospital.db.connection import create_pool, init_schema
+from ai_agent_hospital.db.repository import ThreadRepository
+
+async with create_pool() as pool, open_checkpointer() as checkpointer:
+    await init_schema(pool)
+    agent = await create_hospital_agent(get_llm(), client, checkpointer)
+    threads = ThreadManager(agent, ThreadRepository(pool))
+
+    thread_id = await threads.create_thread({"title": "Dengue SP"})
+    print(await threads.send_message(thread_id, "A dengue está em alta?"))  # grava o histórico
+    history = await threads.get_history(thread_id)       # mensagens em ordem
+    await threads.list_threads()                         # com última mensagem e contagem
+    await threads.get_summary(thread_id)                 # contagem e período
+    fork = await threads.fork_thread(thread_id, 2)       # nova thread com as 2 primeiras
+    await threads.delete_thread(thread_id)               # catálogo, mensagens e checkpoints
+```
+
+Quem usa `agent.stream()` direto chama `threads.sync_messages(thread_id)` ao fim de cada turno.
+O fork só corta numa resposta final do assistente (sem chamada de tool pendente).
+
 ## Estrutura
 
 ```
