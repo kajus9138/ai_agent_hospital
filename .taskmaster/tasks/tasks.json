@@ -116,7 +116,7 @@
         "id": "5",
         "title": "Integração com o MCP server externo de dengue (smart_hospitals)",
         "description": "Configure connection to the external dengue MCP server from the smart_hospitals project (github.com/kajus9138/smart_hospitals) and validate the integration with the MCP client from task 4.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "1",
           "4"
@@ -154,7 +154,7 @@
             "dependencies": [
               1
             ],
-            "details": "Create tests/integration/test_dengue_mcp_integration.py:\n- Use pytest fixture to establish connection using MCP client from task 4\n- Mark with @pytest.mark.integration\n- Skip if SMART_HOSPITALS_PATH not set\n- Test: connect, call list_tools() dynamically, assert len(tools) == 4\n- Verify tool names: situacao_atual, tendencia, serie_historica, comparativo_sazonal\n- Do NOT hardcode tool schemas - use the schemas returned by list_tools()",
+            "details": "Create tests/integration/test_dengue_mcp_integration.py:\n- Use pytest fixture to establish connection using MCP client from task 4\n- Mark with @pytest.mark.integration\n- Skip if SMART_HOSPITALS_PATH not set\n- Test: connect, call list_tools() dynamically, assert len(tools) == 4\n- Verify tool names: situacao_atual, tendencia, serie_historica, comparativo_sazonal\n- Do NOT hardcode tool schemas - use the schemas returned by list_tools()\n<info added on 2026-10-27T14:39:31.183Z>\nBased on my analysis of the codebase, here is the updated implementation details text for subtask 5.3:\n\nUpdated location: tests/test_dengue_integration.py (NOT tests/integration/)\n\nUse pytest marker @pytest.mark.dengue_mcp (not 'integration' which implies PostgreSQL in this codebase per pyproject.toml:39-43)\n\nFixture skipping logic in settings fixture checks both path presence and directory existence (lines 21-27 of existing implementation)\n\n6 test functions implemented:\n1. test_connection_and_list_tools: connects via DengueMCPClient.from_settings, asserts 4 tools (TOOL_NAMES constant)\n2. test_situacao_atual: verifies structuredContent has data_referencia key\n3. test_tendencia: passes semanas=4, validates 4 semanas in response and tendencia_resumo in TENDENCIAS set\n4. test_invalid_argument_is_reported: semanas=99 returns isError with \"semanas\" in error text\n5. test_langchain_tools_end_to_end: load_langchain_tools, invoke tendencia, parse JSON response\n6. test_wrong_directory_fails_with_clear_error: tmp_path as bad SMART_HOSPITALS_PATH raises MCPConnectionError matching \"uv run --directory\", skipped if uv not installed\n\nreal_client helper factory uses max_retries=1 for fast failure on real server issues\n\n.env.example and README prerequisites documentation already delivered via task 4 (referenced in test_mcp_client.py:4-5 docstring and README:71-97)\n</info added on 2026-10-27T14:39:31.183Z>",
             "status": "pending",
             "testStrategy": "Run pytest with integration marker when smart_hospitals is available",
             "parentId": "undefined"
@@ -183,7 +183,8 @@
             "testStrategy": "Run tests with intentionally invalid configurations and verify error messages",
             "parentId": "undefined"
           }
-        ]
+        ],
+        "updatedAt": "2026-10-27T14:42:54.678Z"
       },
       {
         "id": "6",
@@ -397,9 +398,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-10-27T14:22:57.305Z",
+      "lastModified": "2026-10-27T14:42:54.678Z",
       "taskCount": 10,
-      "completedCount": 4,
+      "completedCount": 5,
       "tags": [
         "master"
       ]

@@ -39,6 +39,7 @@ asyncio_mode = "auto"
 markers = [
     "integration: precisa de PostgreSQL (TEST_DATABASE_URL ou DATABASE_URL); pulado se indisponível",
     "ollama: precisa do Ollama com OLLAMA_MODEL baixado; pulado se indisponível",
+    "dengue_mcp: sobe o MCP real do smart_hospitals (SMART_HOSPITALS_PATH); pulado se ausente",
 ]
 
 [dependency-groups]

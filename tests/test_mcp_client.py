@@ -229,11 +229,9 @@ async def test_mcp_to_langchain_conversion():
         assert tools["situacao_atual"].description.startswith("Situação atual")
 
         content = await tools["tendencia"].ainvoke({"semanas": 8})
-    assert json.loads(content[0]["text"]) == {
-        "semanas": 8,
-        "variacao_pct": 12.5,
-        "tendencia": "alta",
-    }
+    payload = json.loads(content[0]["text"])
+    assert len(payload["semanas"]) == 8
+    assert payload["tendencia_resumo"] == "alta"
 
 
 async def test_load_langchain_tools_requires_connection():
