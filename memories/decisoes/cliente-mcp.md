@@ -29,6 +29,10 @@ LangGraph. O texto da task sugeria um conversor JSON Schema → Pydantic feito �
 - [licao] O python-dotenv (1.2.4) expande `${VAR}` nos valores do `.env` mesmo entre aspas simples e troca variável ausente por "": por isso `MCP_SERVER_ARGS` fica comentado no `.env.example` e o padrão vive no `config.py` #config
 - [licao] O transporte stdio usa cancel scopes do anyio: `connect()` e `close()` precisam rodar na mesma task #mcp
 - [convencao] Testes sobem `tests/fake_dengue_server.py` (FastMCP com as 4 tools e dados fixos) com `sys.executable`: stdio real, sem smart_hospitals; o teste com o servidor real é da task 5 #testes
+- [decisao] Task 5 (2026-10-27): integração com o servidor real em `tests/test_dengue_integration.py`, marker `dengue_mcp`; a fixture `settings` pula tudo se SMART_HOSPITALS_PATH não existir (marker sozinho não tira teste da suíte padrão) #testes
+- [alternativa-descartada] Marker `integration` (pedido na task): no repo ele significa "precisa de PostgreSQL"; misturar faria `-m integration` exigir os dois serviços #testes
+- [convencao] Asserts da integração checam só a forma (chaves, tamanho, `tendencia_resumo` ∈ alta/estavel/queda), não valores: eles mudam com o snapshot do InfoDengue no outro repo #testes
+- [licao] O fake da task 4 tinha um contrato de `tendencia` diferente do real (`semanas` int + `tendencia`); alinhado ao real (`semanas` lista + `tendencia_resumo`). Ao mudar o servidor real, confira o fake #testes
 
 ## Relations
 - part_of [[ai_agent_hospital]]

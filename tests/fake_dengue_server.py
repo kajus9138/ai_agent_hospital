@@ -20,7 +20,10 @@ def tendencia(semanas: int = 4) -> dict:
     """Tendência de casos nas últimas N semanas (1 a 52)."""
     if not 1 <= semanas <= 52:
         raise ValueError("semanas deve estar entre 1 e 52")
-    return {"semanas": semanas, "variacao_pct": 12.5, "tendencia": "alta"}
+    serie = [
+        {"SE": 202640 - i, "casos_est": 1161.0, "Rt": 1.2, "p_rt1": 0.9} for i in range(semanas)
+    ]
+    return {"semanas": serie[::-1], "tendencia_resumo": "alta", "rt_medio": 1.2, "p_rt1_medio": 0.9}
 
 
 @mcp.tool()

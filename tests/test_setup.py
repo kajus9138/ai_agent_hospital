@@ -51,7 +51,14 @@ def test_package_structure(package):
 def no_dotenv(monkeypatch):
     """Isola os testes do .env local e das variáveis do ambiente."""
     monkeypatch.setattr(config, "load_dotenv", lambda: None)
-    for var in ("OLLAMA_MODEL", "OLLAMA_BASE_URL", "DATABASE_URL"):
+    for var in (
+        "OLLAMA_MODEL",
+        "OLLAMA_BASE_URL",
+        "DATABASE_URL",
+        "SMART_HOSPITALS_PATH",
+        "MCP_SERVER_COMMAND",
+        "MCP_SERVER_ARGS",
+    ):
         monkeypatch.delenv(var, raising=False)
 
 

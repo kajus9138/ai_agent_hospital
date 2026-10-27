@@ -77,6 +77,17 @@ e aponte `SMART_HOSPITALS_PATH` para o clone no `.env`. O cliente sobe o servido
 dengue-mcp`). As tools (`situacao_atual`, `tendencia`, `serie_historica`, `comparativo_sazonal`)
 são descobertas na conexão e convertidas para tools do LangChain.
 
+Preparar o smart_hospitals (uma vez):
+
+```bash
+git clone https://github.com/kajus9138/smart_hospitals.git ~/smart_hospitals
+cd ~/smart_hospitals && uv sync
+ls data/dengue_sp_snapshot.csv     # snapshot do InfoDengue usado pelas tools
+uv run dengue-mcp                  # deve subir e ficar esperando no stdio (Ctrl+C para sair)
+```
+
+Depois, no `.env` deste projeto: `SMART_HOSPITALS_PATH=/home/<você>/smart_hospitals`.
+
 ```python
 from ai_agent_hospital.mcp_client import DengueMCPClient, load_langchain_tools
 
@@ -111,6 +122,11 @@ apagado no fim, então é seguro apontá-los para o banco de desenvolvimento.
 O teste de integração do LLM (`tests/test_llm.py`) é pulado se o Ollama não responder ou se o
 `OLLAMA_MODEL` não estiver baixado; os demais simulam o Ollama e rodam offline. Para usar outro
 modelo já baixado: `OLLAMA_MODEL=llama3.2:1b uv run pytest -m ollama`.
+
+Os testes marcados com `dengue_mcp` (`tests/test_dengue_integration.py`) sobem o servidor MCP real do
+smart_hospitals e são pulados se `SMART_HOSPITALS_PATH` não estiver definido; os de
+`tests/test_mcp_client.py` usam um servidor falso e rodam sem ele. Só a integração:
+`uv run pytest -m dengue_mcp`.
 
 ## Workflow de desenvolvimento (template)
 
