@@ -46,6 +46,7 @@ class OllamaFailureMiddleware(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse:
+        """Chama o modelo; falha transitória que sobrou do retry vira OllamaConnectionError."""
         try:
             return await handler(request)
         except Exception as exc:
@@ -69,6 +70,7 @@ class ToolFailureMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command[Any]]],
     ) -> ToolMessage | Command[Any]:
+        """Executa a tool; exceção fora do protocolo vira ToolExecutionError."""
         try:
             return await handler(request)
         # GraphBubbleUp: sinais de controle do LangGraph (interrupts), não são falhas.
@@ -79,6 +81,7 @@ class ToolFailureMiddleware(AgentMiddleware):
 
 
 def default_middleware() -> list[AgentMiddleware]:
+    """Middlewares do agente: erro tipado do Ollama, retry do modelo e erro tipado de tool."""
     # O primeiro da lista é o mais externo: OllamaFailureMiddleware só vê a falha final do retry.
     return [
         OllamaFailureMiddleware(),

@@ -14,6 +14,8 @@ DEFAULT_MCP_SERVER_ARGS = "run --directory ${SMART_HOSPITALS_PATH} dengue-mcp"
 
 @dataclass(frozen=True)
 class Settings:
+    """Configurações da aplicação; veja a tabela de variáveis no README."""
+
     ollama_model: str
     ollama_base_url: str
     database_url: str
