@@ -1,11 +1,10 @@
-"""Ponto de entrada da aplicação."""
+"""Ponto de entrada da aplicação: a CLI."""
 
-from ai_agent_hospital.config import get_settings
+from ai_agent_hospital.cli import app
 
 
 def main() -> None:
-    settings = get_settings()
-    print(f"ai_agent_hospital — modelo {settings.ollama_model} em {settings.ollama_base_url}")
+    app()
 
 
 if __name__ == "__main__":

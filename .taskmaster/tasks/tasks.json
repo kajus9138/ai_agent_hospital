@@ -299,15 +299,16 @@
         "id": "8",
         "title": "CLI User Interface",
         "description": "Create an interactive command-line interface for users to interact with the hospital agent, manage threads, and view conversation history.",
-        "details": "1. Create src/ai_agent_hospital/cli.py using Typer or Click:\n   ```python\n   import typer\n   from rich.console import Console\n   from rich.panel import Panel\n   \n   app = typer.Typer()\n   console = Console()\n   \n   @app.command()\n   async def chat(thread_id: str = None):\n       '''Start interactive chat session'''\n       if not thread_id:\n           thread_id = await create_new_thread()\n       \n       console.print(f'Thread: {thread_id}', style='dim')\n       while True:\n           user_input = console.input('[bold green]You:[/] ')\n           if user_input.lower() in ('exit', 'quit'):\n               break\n           \n           with console.status('Thinking...'):\n               response = await agent.invoke(user_input, thread_id)\n           console.print(Panel(response, title='Assistant'))\n   \n   @app.command()\n   async def threads():\n       '''List all conversation threads'''\n   \n   @app.command()\n   async def history(thread_id: str):\n       '''Show conversation history for a thread'''\n   ```\n\n2. Add rich formatting:\n   - Colored output for user/assistant messages\n   - Tables for thread listing\n   - Progress indicators during LLM calls\n\n3. Add entry point in pyproject.toml:\n   ```toml\n   [project.scripts]\n   hospital-agent = 'ai_agent_hospital.cli:app'\n   ```\n\n4. Handle Ctrl+C gracefully, auto-save on exit",
+        "details": "1. Create src/ai_agent_hospital/cli.py using Typer or Click:\n   ```python\n   import typer\n   from rich.console import Console\n   from rich.panel import Panel\n   \n   app = typer.Typer()\n   console = Console()\n   \n   @app.command()\n   async def chat(thread_id: str = None):\n       '''Start interactive chat session'''\n       if not thread_id:\n           thread_id = await create_new_thread()\n       \n       console.print(f'Thread: {thread_id}', style='dim')\n       while True:\n           user_input = console.input('[bold green]You:[/] ')\n           if user_input.lower() in ('exit', 'quit'):\n               break\n           \n           with console.status('Thinking...'):\n               response = await agent.invoke(user_input, thread_id)\n           console.print(Panel(response, title='Assistant'))\n   \n   @app.command()\n   async def threads():\n       '''List all conversation threads'''\n   \n   @app.command()\n   async def history(thread_id: str):\n       '''Show conversation history for a thread'''\n   ```\n\n2. Add rich formatting:\n   - Colored output for user/assistant messages\n   - Tables for thread listing\n   - Progress indicators during LLM calls\n\n3. Add entry point in pyproject.toml:\n   ```toml\n   [project.scripts]\n   hospital-agent = 'ai_agent_hospital.cli:app'\n   ```\n\n4. Handle Ctrl+C gracefully, auto-save on exit\n<info added on 2026-10-27T18:29:03.553Z>\nImplementation notes (Implemented 2026-10-27):\n\nCLI implemented in src/ai_agent_hospital/cli.py with Typer 0.27.3 + Rich + prompt_toolkit. Stack: Typer for commands, Rich for TUI (Console, Live, Panel, Markdown, Table, Status), prompt_toolkit for async-safe input.\n\nCommands:\n- chat [--thread UUID]: interactive loop, creates new thread or resumes existing; streams tokens and tool calls in real-time via TurnRenderer (Live + Status); sync_messages after each turn; Ctrl+C cancels only the current turn via loop.add_signal_handler(SIGINT), conversation continues; Ctrl+D/exit/quit ends session\n- threads: lists all threads in a Rich table (ID, created_at, message count, preview)\n- history <thread_id>: shows numbered messages (number used for fork)\n- fork <thread_id> --from N: creates new thread from first N messages\n- delete <thread_id> [--yes/-y]: deletes thread with confirmation\n\nKey implementation decisions:\n- Typer 0.27.3 does not support native async commands; each command wraps its async logic in asyncio.run() via _run() helper\n- Discarded to_thread(console.input) approach: Ctrl+C hung asyncio.run waiting on input thread; solved with prompt_toolkit.PromptSession.prompt_async()\n- Signal handler pattern: add_signal_handler(SIGINT, cancel_turn) installed around chat loop; safely removed on exit; suppresses NotImplementedError/RuntimeError/ValueError when not running in main thread or terminal\n- Error handling: agent errors, GraphRecursionError, and startup failures handled gracefully with Rich-formatted messages\n\nEntry point: pyproject.toml [project.scripts] ai-agent-hospital = \"ai_agent_hospital.cli:app\"\n\nTest coverage: 110 passed, 12 skipped (tests/test_cli.py). Integration tests use real PostgreSQL with schema_url fixture, ScriptedChatModel/StreamingChatModel/FailingChatModel/HangingChatModel variants, FakeManager for CLI command tests via CliRunner.\n</info added on 2026-10-27T18:29:03.553Z>",
         "testStrategy": "(1) Test CLI commands parse correctly, (2) Test chat loop handles input/output, (3) Test thread listing displays correctly, (4) Manual testing: run interactive session with real agent",
         "priority": "medium",
         "dependencies": [
           "6",
           "7"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-10-27T18:37:28.665Z"
       },
       {
         "id": "9",
@@ -406,9 +407,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-10-27T18:16:10.924Z",
+      "lastModified": "2026-10-27T18:37:28.665Z",
       "taskCount": 10,
-      "completedCount": 7,
+      "completedCount": 8,
       "tags": [
         "master"
       ]
