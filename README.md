@@ -14,7 +14,7 @@ modelo baixado (`ollama pull llama3.2`) e um PostgreSQL acessível.
 
 ```bash
 uv sync                 # cria o .venv com Python 3.12 e instala as dependências
-cp .env.example .env    # ajuste OLLAMA_MODEL, OLLAMA_BASE_URL e DATABASE_URL
+cp .env.example .env    # ajuste OLLAMA_*, DATABASE_URL e SMART_HOSPITALS_PATH
 docker compose up -d    # PostgreSQL 16 local, com as mesmas credenciais do .env.example
 uv run ai-agent-hospital
 ```
@@ -66,6 +66,23 @@ async def main():
 
 
 asyncio.run(main())
+```
+
+### Servidor MCP de dengue (smart_hospitals)
+
+Os dados de dengue vêm do servidor MCP do projeto
+[smart_hospitals](https://github.com/kajus9138/smart_hospitals), que **não** fica neste repo: clone-o
+e aponte `SMART_HOSPITALS_PATH` para o clone no `.env`. O cliente sobe o servidor via stdio com
+`MCP_SERVER_COMMAND` + `MCP_SERVER_ARGS` (padrão: `uv run --directory ${SMART_HOSPITALS_PATH}
+dengue-mcp`). As tools (`situacao_atual`, `tendencia`, `serie_historica`, `comparativo_sazonal`)
+são descobertas na conexão e convertidas para tools do LangChain.
+
+```python
+from ai_agent_hospital.mcp_client import DengueMCPClient, load_langchain_tools
+
+async with DengueMCPClient.from_settings() as client:  # 3 tentativas, com backoff
+    tools = await load_langchain_tools(client)  # válidas enquanto o cliente estiver conectado
+    resultado = await client.call_tool("tendencia", {"semanas": 8})
 ```
 
 ## Estrutura

@@ -45,7 +45,7 @@
         "id": "4",
         "title": "MCP Client for Stdio Communication",
         "description": "Implement MCP client that connects to the external smart_hospitals MCP server via stdio for retrieving dengue data from São Paulo.",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "1"
         ],
@@ -58,7 +58,7 @@
             "title": "Create MCPConnectionError exception and client base structure",
             "description": "Implement the base DengueMCPClient class with configuration validation and MCPConnectionError exception",
             "dependencies": [],
-            "details": "Create src/ai_agent_hospital/mcp_client/__init__.py and src/ai_agent_hospital/mcp_client/client.py with:\n- MCPConnectionError exception class with clear error messages\n- DengueMCPClient.__init__ with shlex.split for args parsing\n- Environment variable expansion (${SMART_HOSPITALS_PATH})\n- _validate_config method checking command exists (shutil.which) and directory exists (Path.is_dir)\n- StdioServerParameters construction with cwd and env",
+            "details": "Create src/ai_agent_hospital/mcp_client/__init__.py and src/ai_agent_hospital/mcp_client/client.py with:\n- MCPConnectionError exception class with clear error messages\n- DengueMCPClient.__init__ with shlex.split for args parsing\n- Environment variable expansion (${SMART_HOSPITALS_PATH})\n- _validate_config method checking command exists (shutil.which) and directory exists (Path.is_dir)\n- StdioServerParameters construction with cwd and env\n<info added on 2026-10-27T14:18:31.695Z>\nImplementation complete in src/ai_agent_hospital/mcp_client/client.py:\n\nMCPConnectionError (line 22): custom exception with descriptive messages for config and connection failures.\n\nDengueMCPClient.__init__ (line 33): accepts server_command, server_args, smart_hospitals_path. Validates ${SMART_HOSPITALS_PATH} placeholder presence and raises MCPConnectionError if env var is missing (lines 52-57). Uses shlex.split to parse server_args into a list (line 66).\n\n_validate_config (line 88): checks command exists via shutil.which (raises if missing with install hint), and validates path is a directory via Path.is_dir.\n\nStdioServerParameters (line 64): constructed with command, args (shlex-split), cwd=smart_hospitals_path, and env=inherited os.environ dict plus SMART_HOSPITALS_PATH entry.\n\nSettings loaded via config.py with MCP_SERVER_COMMAND (default uv), MCP_SERVER_ARGS (default includes placeholder), and SMART_HOSPITALS_PATH env var.\n</info added on 2026-10-27T14:18:31.695Z>",
             "status": "pending",
             "testStrategy": "Unit tests for args parsing, env expansion, and validation errors with mocked shutil.which and Path",
             "parentId": "undefined"
@@ -70,7 +70,7 @@
             "dependencies": [
               1
             ],
-            "details": "Implement in client.py:\n- connect() using mcp.stdio_client context manager\n- list_tools() returning dynamic tool list from server\n- call_tool(name, arguments) executing tools and returning results\n- close() for graceful cleanup\n- __aenter__/__aexit__ for async context manager pattern\n- Reconnection logic with exponential backoff on transient failures",
+            "details": "Implement in client.py:\n- connect() using mcp.stdio_client context manager\n- list_tools() returning dynamic tool list from server\n- call_tool(name, arguments) executing tools and returning results\n- close() for graceful cleanup\n- __aenter__/__aexit__ for async context manager pattern\n- Reconnection logic with exponential backoff on transient failures\n<info added on 2026-10-27T14:18:54.448Z>\nImplementation notes for subtask 4.2:\n\nconnect() uses AsyncExitStack to manage both stdio_client and ClientSession contexts. Each attempt has its own stack and is wrapped in asyncio.timeout(connect_timeout). Exponential backoff: on attempt N (0-indexed), waits retry_delay * 2^(N-1) seconds before retrying (no wait on first attempt). Failed attempts close the partial stack via _close_quietly() to handle cases where the subprocess already died.\n\nclose() is idempotent: it swaps _stack and _session to None in one line before calling aclose(), so repeated calls are no-ops. The async context manager (__aenter__/__aexit__) delegates to connect()/close().\n\nReconnection mid-call is NOT implemented: tools are bound to the ClientSession, so if the connection drops during call_tool(), the caller must catch the exception, call close(), then connect() again and retry the tool call. This was intentionally left out to keep the client stateless regarding retries during calls.\n</info added on 2026-10-27T14:18:54.448Z>",
             "status": "pending",
             "testStrategy": "Unit tests with mocked stdio_client and ClientSession, test reconnection logic",
             "parentId": "undefined"
@@ -82,7 +82,7 @@
             "dependencies": [
               2
             ],
-            "details": "Create src/ai_agent_hospital/mcp_client/tools.py with:\n- mcp_tools_to_langchain(mcp_client) async function\n- _schema_to_pydantic(name, schema) helper using pydantic.create_model\n- Handle JSON Schema types (string, integer, null, arrays) to Python types\n- Handle required vs optional fields and defaults\n- Create async wrapper functions that call mcp_client.call_tool\n- No hardcoded tool names - fully dynamic discovery",
+            "details": "Create src/ai_agent_hospital/mcp_client/tools.py with:\n- mcp_tools_to_langchain(mcp_client) async function\n- _schema_to_pydantic(name, schema) helper using pydantic.create_model\n- Handle JSON Schema types (string, integer, null, arrays) to Python types\n- Handle required vs optional fields and defaults\n- Create async wrapper functions that call mcp_client.call_tool\n- No hardcoded tool names - fully dynamic discovery\n<info added on 2026-10-27T14:19:20.478Z>\nSimplified approach: instead of manual JSON Schema to Pydantic conversion, load_langchain_tools delegates to langchain_mcp_adapters.load_mcp_tools(client.session) as per task 1 decision. The library handles schema mapping and error propagation internally. MCP tool errors (isError=True) are automatically surfaced to the agent as ToolMessage with error content, allowing the LLM to self-correct. This is already implemented in src/ai_agent_hospital/mcp_client/tools.py:15.\n</info added on 2026-10-27T14:19:20.478Z>",
             "status": "pending",
             "testStrategy": "Test with mock tools having various inputSchema patterns, verify StructuredTool has correct args_schema",
             "parentId": "undefined"
@@ -92,7 +92,7 @@
             "title": "Update .env.example and config.py with MCP settings",
             "description": "Add SMART_HOSPITALS_PATH, MCP_SERVER_COMMAND, and MCP_SERVER_ARGS to environment configuration",
             "dependencies": [],
-            "details": "Update .env.example with documented MCP settings:\n- SMART_HOSPITALS_PATH with comment about cloning smart_hospitals repo\n- MCP_SERVER_COMMAND=uv\n- MCP_SERVER_ARGS=run --directory ${SMART_HOSPITALS_PATH} dengue-mcp\n\nUpdate config.py (task 1) Settings class to include these with appropriate types and defaults",
+            "details": "Update .env.example with documented MCP settings:\n- SMART_HOSPITALS_PATH with comment about cloning smart_hospitals repo\n- MCP_SERVER_COMMAND=uv\n- MCP_SERVER_ARGS=run --directory ${SMART_HOSPITALS_PATH} dengue-mcp\n\nUpdate config.py (task 1) Settings class to include these with appropriate types and defaults\n<info added on 2026-10-27T14:19:39.242Z>\nImplementation complete:\n\nSettings class in config.py now includes smart_hospitals_path (str | None, default None), mcp_server_command (default \"uv\"), and mcp_server_args (default \"run --directory ${SMART_HOSPITALS_PATH} dengue-mcp\").\n\n.env.example updated: MCP_SERVER_ARGS line is commented out with explanation that python-dotenv 1.2.4 interpolates ${...} even inside single quotes, replacing missing variables with empty string, which would silently hide a missing SMART_HOSPITALS_PATH.\n</info added on 2026-10-27T14:19:39.242Z>",
             "status": "pending",
             "testStrategy": "Verify .env.example has correct format and config.py loads settings correctly",
             "parentId": "undefined"
@@ -104,12 +104,13 @@
             "dependencies": [
               3
             ],
-            "details": "Create tests/unit/test_mcp_client.py with:\n- MOCK_TOOLS fixture with 4 dengue tools and their inputSchema\n- test_connection_establishment with mocked stdio_client\n- test_tool_listing with mocked session.list_tools\n- test_tool_invocation with sample response data\n- test_mcp_to_langchain_conversion verifying StructuredTool creation\n- test_invalid_command_error and test_invalid_directory_error\n- test_args_parsing and test_env_variable_expansion\n\nUse pytest-asyncio for async tests and unittest.mock for mocking",
+            "details": "Create tests/unit/test_mcp_client.py with:\n- MOCK_TOOLS fixture with 4 dengue tools and their inputSchema\n- test_connection_establishment with mocked stdio_client\n- test_tool_listing with mocked session.list_tools\n- test_tool_invocation with sample response data\n- test_mcp_to_langchain_conversion verifying StructuredTool creation\n- test_invalid_command_error and test_invalid_directory_error\n- test_args_parsing and test_env_variable_expansion\n\nUse pytest-asyncio for async tests and unittest.mock for mocking\n<info added on 2026-10-27T14:20:08.103Z>\nLet me also check the overall test results and structure.Based on my analysis of the codebase, here is the implementation notes text for subtask 4.5:\n\nImplemented tests/test_mcp_client.py with 17 tests and tests/fake_dengue_server.py (FastMCP fake server with 4 dengue tools) using real stdio transport without requiring smart_hospitals repo. Test file structure: args parsing tests (test_args_parsing, test_args_parsing_respects_quotes, test_env_variable_expansion_sets_cwd_and_env, test_placeholder_without_path_error), error validation tests (test_invalid_command_error, test_invalid_directory_error, test_session_before_connect_error), config tests (test_from_settings, test_settings_read_mcp_env, test_settings_mcp_defaults), connection tests (test_connection_and_tool_listing, test_tool_invocation, test_tool_error_is_reported_not_raised, test_close_is_idempotent_and_disconnects, test_connect_retries_with_exponential_backoff), and LangChain conversion tests (test_mcp_to_langchain_conversion, test_load_langchain_tools_requires_connection). Full suite results: 48 passed, 9 skipped. The fake server in tests/fake_dengue_server.py exposes situacao_atual, tendencia, serie_historica, and comparativo_sazonal tools matching the real smart_hospitals interface.\n</info added on 2026-10-27T14:20:08.103Z>",
             "status": "pending",
             "testStrategy": "Run pytest tests/unit/test_mcp_client.py, all tests should pass without external dependencies",
             "parentId": "undefined"
           }
-        ]
+        ],
+        "updatedAt": "2026-10-27T14:22:57.304Z"
       },
       {
         "id": "5",
@@ -396,9 +397,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-10-27T13:40:35.360Z",
+      "lastModified": "2026-10-27T14:22:57.305Z",
       "taskCount": 10,
-      "completedCount": 3,
+      "completedCount": 4,
       "tags": [
         "master"
       ]
