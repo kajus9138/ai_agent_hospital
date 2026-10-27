@@ -37,6 +37,37 @@ async with create_pool() as pool:  # usa DATABASE_URL
     messages = await repo.get_thread_messages(thread_id)
 ```
 
+### LLM (Ollama)
+
+O modelo vem de `OLLAMA_MODEL` (padrão `llama3.2`) servido em `OLLAMA_BASE_URL`. `get_llm()` devolve
+um `ChatOllama` (chat model do LangChain, usável no LangGraph) com temperatura 0.1, para um
+raciocínio mais consistente. `check_ollama_health()` confirma que o Ollama responde **e** que o
+modelo configurado já foi baixado.
+
+Modelos recomendados para ReAct (precisam de suporte a tool calling): `llama3.2` (3B, leve),
+`qwen2.5` (7B, o mais confiável em tool calling) e `mistral` (7B). O `llama3.2:1b` serve para testes
+rápidos, mas erra com frequência ao chamar tools.
+
+```bash
+ollama pull llama3.2
+```
+
+```python
+import asyncio
+
+from ai_agent_hospital.agent.llm import check_ollama_health, get_llm
+
+
+async def main():
+    if await check_ollama_health():
+        llm = get_llm()  # ou get_llm(temperature=0) para sobrescrever padrões
+        resposta = await llm.ainvoke("Quais os sintomas de alerta da dengue?")
+        print(resposta.content)
+
+
+asyncio.run(main())
+```
+
 ## Estrutura
 
 ```
@@ -59,6 +90,10 @@ uv run ruff check . && uv run ruff format --check . # lint e formatação
 Os testes marcados com `integration` (`tests/test_db.py`) usam `TEST_DATABASE_URL` (ou `DATABASE_URL`)
 e são pulados se o PostgreSQL não estiver acessível. Cada teste roda num schema temporário que é
 apagado no fim, então é seguro apontá-los para o banco de desenvolvimento.
+
+O teste de integração do LLM (`tests/test_llm.py`) é pulado se o Ollama não responder ou se o
+`OLLAMA_MODEL` não estiver baixado; os demais simulam o Ollama e rodam offline. Para usar outro
+modelo já baixado: `OLLAMA_MODEL=llama3.2:1b uv run pytest -m ollama`.
 
 ## Workflow de desenvolvimento (template)
 
