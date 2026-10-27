@@ -96,6 +96,26 @@ async with DengueMCPClient.from_settings() as client:  # 3 tentativas, com backo
     resultado = await client.call_tool("tendencia", {"semanas": 8})
 ```
 
+### Agente ReAct
+
+`HospitalReActAgent` monta o grafo ReAct com `langchain.agents.create_agent` (sucessor do
+`create_react_agent` do LangGraph), o prompt de sistema em `agent/prompts.py` e as tools descobertas
+no servidor MCP. Cada conversa é um `thread_id`; com o checkpointer do PostgreSQL
+(`open_checkpointer()`, que cria suas tabelas na primeira vez), o histórico sobrevive a reinícios.
+
+```python
+from ai_agent_hospital.agent.checkpointer import open_checkpointer
+from ai_agent_hospital.agent.llm import get_llm
+from ai_agent_hospital.agent.react_agent import create_hospital_agent
+from ai_agent_hospital.mcp_client import DengueMCPClient
+
+async with DengueMCPClient.from_settings() as client, open_checkpointer() as checkpointer:
+    agent = await create_hospital_agent(get_llm(), client, checkpointer)
+    print(await agent.invoke("A dengue está em alta ou queda?", thread_id="gestor-1"))
+    async for event in agent.stream("E comparado a 2024?", thread_id="gestor-1"):
+        ...  # eventos do astream_events (v2): tokens do modelo, início/fim de tools
+```
+
 ## Estrutura
 
 ```
@@ -127,6 +147,10 @@ Os testes marcados com `dengue_mcp` (`tests/test_dengue_integration.py`) sobem o
 smart_hospitals e são pulados se `SMART_HOSPITALS_PATH` não estiver definido; os de
 `tests/test_mcp_client.py` usam um servidor falso e rodam sem ele. Só a integração:
 `uv run pytest -m dengue_mcp`.
+
+O agente (`tests/test_react_agent.py`) é testado com um LLM roteirizado e roda offline; só a
+persistência entre reinícios é `integration`. `tests/test_agent_e2e.py` usa Ollama **e** o MCP real
+(`-m "ollama and dengue_mcp"`) e checa comportamento (tool chamada, admitir falta de dado), não texto.
 
 ## Workflow de desenvolvimento (template)
 
