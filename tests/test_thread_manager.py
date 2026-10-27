@@ -198,7 +198,28 @@ async def test_send_message_failure_keeps_agent_error_and_partial_history(checkp
     with pytest.raises(RuntimeError, match="servidor MCP caiu"):
         await manager.send_message(thread_id, "Como está a dengue?")
 
-    # O que o grafo gravou antes da falha (pergunta + chamada da tool) está no histórico.
+    # O que o grafo gravou antes da falha (pergunta + chamada da tool) está no histórico, e a
+    # chamada sem resultado foi fechada com um erro.
     history = await manager.get_history(thread_id)
-    assert [m.role for m in history] == ["user", "assistant"]
+    assert [m.role for m in history] == ["user", "assistant", "tool"]
     assert history[1].tool_calls[0]["name"] == "tool_quebrada"
+    assert "interrompida" in history[2].content
+
+
+@pytest.mark.integration
+async def test_close_pending_tool_calls_lets_conversation_continue(checkpointer, pool):
+    llm = scripted(tool_call("tool_quebrada"), "Não consegui consultar agora.")
+    manager = ThreadManager(
+        HospitalReActAgent(llm, [tool_quebrada], checkpointer), ThreadRepository(pool)
+    )
+    thread_id = await manager.create_thread()
+    with pytest.raises(RuntimeError):
+        await manager.send_message(thread_id, "Como está a dengue?")
+
+    assert await manager.close_pending_tool_calls(thread_id) == 0  # já fechadas; idempotente
+    assert await manager.send_message(thread_id, "E agora?") == "Não consegui consultar agora."
+
+    # O modelo recebeu a chamada com resposta, antes da nova pergunta.
+    sent = llm.calls[1]
+    assert isinstance(sent[-2], ToolMessage) and sent[-2].tool_call_id == "call_1"
+    assert sent[-1].text == "E agora?"

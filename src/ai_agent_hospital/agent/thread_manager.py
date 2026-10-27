@@ -75,10 +75,40 @@ class ThreadManager:
             # O que chegou ao checkpoint antes da falha vai para o histórico, mas o erro que
             # importa é o do agente: uma falha aqui não o esconde (o próximo sync recupera).
             with suppress(Exception):
+                await self.close_pending_tool_calls(thread_id)
                 await self.sync_messages(thread_id)
             raise
         await self.sync_messages(thread_id)
         return answer
+
+    async def close_pending_tool_calls(
+        self, thread_id: UUID, reason: str = "Execução interrompida antes do resultado."
+    ) -> int:
+        """Responde com erro as chamadas de tool que ficaram sem resultado no estado do grafo.
+
+        Um turno que falha ou é cancelado durante uma tool deixa a última AIMessage com `tool_calls`
+        sem ToolMessage; a próxima pergunta iria para o modelo com esse histórico quebrado. Devolve
+        quantas chamadas foram fechadas.
+        """
+        messages = await self._state_messages(thread_id)
+        last_ai = next(
+            (i for i in range(len(messages) - 1, -1, -1) if isinstance(messages[i], AIMessage)),
+            None,
+        )
+        if last_ai is None:
+            return 0
+        answered = {m.tool_call_id for m in messages[last_ai + 1 :] if isinstance(m, ToolMessage)}
+        missing = [
+            ToolMessage(content=reason, tool_call_id=call["id"], name=call["name"], status="error")
+            for call in messages[last_ai].tool_calls
+            if call["id"] not in answered
+        ]
+        if missing:
+            # as_node="tools": é o nó que teria produzido essas mensagens.
+            await self.graph.aupdate_state(
+                self._config(thread_id), {"messages": missing}, as_node="tools"
+            )
+        return len(missing)
 
     async def sync_messages(self, thread_id: UUID) -> int:
         """Grava no repository as mensagens do estado do grafo que ainda não estão lá.

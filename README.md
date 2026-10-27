@@ -16,7 +16,7 @@ modelo baixado (`ollama pull llama3.2`) e um PostgreSQL acessível.
 uv sync                 # cria o .venv com Python 3.12 e instala as dependências
 cp .env.example .env    # ajuste OLLAMA_*, DATABASE_URL e SMART_HOSPITALS_PATH
 docker compose up -d    # PostgreSQL 16 local, com as mesmas credenciais do .env.example
-uv run ai-agent-hospital
+uv run ai-agent-hospital chat  # veja a seção CLI
 ```
 
 ### Banco de dados
@@ -133,15 +133,33 @@ async with create_pool() as pool, open_checkpointer() as checkpointer:
 
     thread_id = await threads.create_thread({"title": "Dengue SP"})
     print(await threads.send_message(thread_id, "A dengue está em alta?"))  # grava o histórico
-    history = await threads.get_history(thread_id)       # mensagens em ordem
-    await threads.list_threads()                         # com última mensagem e contagem
-    await threads.get_summary(thread_id)                 # contagem e período
-    fork = await threads.fork_thread(thread_id, 2)       # nova thread com as 2 primeiras
-    await threads.delete_thread(thread_id)               # catálogo, mensagens e checkpoints
+    history = await threads.get_history(thread_id)  # mensagens em ordem
+    await threads.list_threads()  # com última mensagem e contagem
+    await threads.get_summary(thread_id)  # contagem e período
+    fork = await threads.fork_thread(thread_id, 2)  # nova thread com as 2 primeiras
+    await threads.delete_thread(thread_id)  # catálogo, mensagens e checkpoints
 ```
 
 Quem usa `agent.stream()` direto chama `threads.sync_messages(thread_id)` ao fim de cada turno.
 O fork só corta numa resposta final do assistente (sem chamada de tool pendente).
+
+## CLI
+
+```bash
+uv run ai-agent-hospital chat                    # conversa numa thread nova
+uv run ai-agent-hospital chat --thread <id>      # retoma uma thread
+uv run ai-agent-hospital threads                 # lista as threads e a última mensagem
+uv run ai-agent-hospital history <id>            # mensagens numeradas da thread
+uv run ai-agent-hospital fork <id> --from 4      # thread nova com as 4 primeiras mensagens
+uv run ai-agent-hospital delete <id> [--yes]     # apaga thread, histórico e checkpoints
+```
+
+O `chat` precisa do PostgreSQL, do Ollama com o modelo baixado e do smart_hospitals; os demais
+comandos só do PostgreSQL. A resposta aparece conforme o modelo gera, com uma linha para cada tool
+consultada. No chat, `sair` (ou `exit`/`quit`, Ctrl+D) encerra; Ctrl+C interrompe só a resposta em
+andamento. O histórico é gravado ao fim de cada turno, inclusive quando ele falha; uma tool
+interrompida fica registrada com erro (`ThreadManager.close_pending_tool_calls`), e a conversa segue.
+Para voltar a um ponto anterior, use o `fork` (o número vem do `history`).
 
 ## Estrutura
 
@@ -151,7 +169,8 @@ src/ai_agent_hospital/
   db/           # persistência das threads no PostgreSQL
   mcp_client/   # comunicação com o MCP local (stdio)
   config.py     # configurações via variáveis de ambiente / .env
-  main.py       # ponto de entrada (comando ai-agent-hospital)
+  cli.py        # CLI (comando ai-agent-hospital)
+  main.py       # ponto de entrada que chama a CLI
 tests/
 ```
 
