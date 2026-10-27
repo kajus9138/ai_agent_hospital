@@ -30,6 +30,9 @@ Postgres, streaming e as tools do MCP de dengue. Verificado no Context7 e no có
 - [convencao] Testes unitários usam `ScriptedChatModel` (BaseChatModel com `_generate` só, `bind_tools` devolvendo self, guarda as mensagens recebidas) + `InMemorySaver`; sem `_stream`, o `astream_events` não perde os `tool_calls` #testes
 - [convencao] `tests/test_agent_e2e.py` exige `ollama` e `dengue_mcp`; asserts de comportamento (tool chamada, admitir dado ausente), não de texto #testes
 - [licao] Fixture async com `yield` não pode segurar o `DengueMCPClient`: o pytest-asyncio roda setup e teardown em tasks diferentes; abrir o cliente dentro do teste #testes
+- [decisao] Prompt ganhou a regra 4: pergunta com recorte indisponível (bairro/zona) deve começar avisando a limitação antes de mostrar dados do município #prompt
+- [licao] Com qwen2.5 (7B) o e2e passa 5/6; na "Zona Leste" ele mostra os dados do município sem avisar, mesmo com a regra 4. Caso marcado `xfail(strict=False)` para acusar XPASS quando um modelo melhor acertar #ollama
+- [alternativa-descartada] Detectar recorte geográfico no código e prefixar o aviso: garantido, mas é lógica fora do agente ReAct; reavaliar na CLI #agente
 - [licao] `llama3.2:1b` chama tools com argumentos inventados e às vezes não termina em tempo útil; para validar o agente use `llama3.2` ou `qwen2.5` #ollama
 
 ## Relations
