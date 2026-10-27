@@ -49,6 +49,7 @@ class ThreadManager:
 
     @property
     def graph(self):
+        """Grafo compilado do agente (com o checkpointer)."""
         return self.agent.graph
 
     @staticmethod
@@ -64,6 +65,7 @@ class ThreadManager:
         return list(state.values.get("messages", []))
 
     async def create_thread(self, metadata: dict[str, Any] | None = None) -> UUID:
+        """Cria a thread no catálogo; o UUID devolvido é o `thread_id` do grafo."""
         return await self.repository.create_thread(metadata)
 
     async def send_message(self, thread_id: UUID, text: str) -> str:
@@ -129,9 +131,11 @@ class ThreadManager:
         return await self.repository.get_thread_messages(thread_id)
 
     async def list_threads(self) -> list[ThreadPreview]:
+        """Threads com a última mensagem, da atividade mais recente para a mais antiga."""
         return await self.repository.list_threads_with_preview()
 
     async def get_summary(self, thread_id: UUID) -> ThreadSummary:
+        """Contagem e período das mensagens; ThreadNotFoundError se a thread não existe."""
         summary = await self.repository.get_thread_summary(thread_id)
         if summary is None:
             raise ThreadNotFoundError(f"Thread {thread_id} não encontrada.")

@@ -34,6 +34,8 @@ async def _insert_messages(cur: AsyncCursor, thread_id: UUID, messages: list[New
 
 @dataclass(frozen=True)
 class Thread:
+    """Linha da tabela threads."""
+
     id: UUID
     created_at: datetime
     metadata: dict[str, Any]
@@ -41,6 +43,8 @@ class Thread:
 
 @dataclass(frozen=True)
 class Message:
+    """Linha da tabela messages; `tool_calls` só em mensagens do assistente que chamam tools."""
+
     id: UUID
     thread_id: UUID
     role: str
@@ -63,6 +67,8 @@ class ThreadPreview:
 
 @dataclass(frozen=True)
 class ThreadSummary:
+    """Contagem e período (primeira e última mensagem) de uma thread."""
+
     id: UUID
     message_count: int
     first_message_at: datetime | None
@@ -70,10 +76,13 @@ class ThreadSummary:
 
 
 class ThreadRepository:
+    """Acesso às tabelas threads e messages sobre um pool de conexões async."""
+
     def __init__(self, pool: AsyncConnectionPool):
         self.pool = pool
 
     async def create_thread(self, metadata: dict[str, Any] | None = None) -> UUID:
+        """Cria a thread com os metadados (ex.: título) e devolve o id gerado pelo banco."""
         async with self.pool.connection() as conn:
             cur = await conn.execute(
                 "INSERT INTO threads (metadata) VALUES (%s) RETURNING id",
@@ -83,6 +92,7 @@ class ThreadRepository:
         return thread_id
 
     async def get_thread(self, thread_id: UUID) -> Thread | None:
+        """A thread, ou None se ela não existe."""
         async with self.pool.connection() as conn:
             cur = conn.cursor(row_factory=class_row(Thread))
             await cur.execute(
@@ -103,6 +113,7 @@ class ThreadRepository:
         content: str,
         tool_calls: list[dict[str, Any]] | None = None,
     ) -> Message:
+        """Grava uma mensagem no fim da thread e a devolve com id e data."""
         async with self.pool.connection() as conn:
             cur = conn.cursor(row_factory=class_row(Message))
             await cur.execute(
@@ -144,6 +155,7 @@ class ThreadRepository:
         return len(messages) - saved
 
     async def count_messages(self, thread_id: UUID) -> int:
+        """Quantas mensagens a thread tem."""
         async with self.pool.connection() as conn:
             cur = await conn.execute(
                 "SELECT count(*) FROM messages WHERE thread_id = %s", (thread_id,)
@@ -152,6 +164,7 @@ class ThreadRepository:
         return count
 
     async def get_thread_messages(self, thread_id: UUID) -> list[Message]:
+        """Mensagens da thread em ordem de inserção (`seq`)."""
         async with self.pool.connection() as conn:
             cur = conn.cursor(row_factory=class_row(Message))
             await cur.execute(
@@ -166,6 +179,7 @@ class ThreadRepository:
             return await cur.fetchall()
 
     async def list_threads(self) -> list[Thread]:
+        """Todas as threads, da criada mais recentemente para a mais antiga."""
         async with self.pool.connection() as conn:
             cur = conn.cursor(row_factory=class_row(Thread))
             await cur.execute(

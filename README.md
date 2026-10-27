@@ -1,23 +1,100 @@
 # ai_agent_hospital
 
-POC de um agente ReAct para um tomador de decisão em um hospital inteligente. O agente usa um LLM
-local servido pelo Ollama, guarda as threads de conversa no PostgreSQL e consulta um servidor MCP
-local (via stdio) com dados de dengue em São Paulo.
+POC de um agente ReAct de apoio à decisão para um hospital inteligente. Um gestor pergunta, em
+português, como está a dengue em São Paulo; o agente decide quais dados consultar, chama as tools de
+um servidor MCP local, raciocina sobre os indicadores (casos estimados, nível de alerta, Rt,
+comparação com anos anteriores) e responde citando a semana de referência. Tudo roda na máquina: o
+LLM no Ollama, as conversas no PostgreSQL e os dados num servidor MCP iniciado via stdio.
+
+```mermaid
+flowchart LR
+    gestor([Gestor]) --> cli["CLI<br/>ai-agent-hospital"]
+    cli --> agente["Agente ReAct<br/>(LangGraph)"]
+    agente -->|raciocínio| ollama[("Ollama<br/>LLM local")]
+    agente -->|threads| pg[("PostgreSQL")]
+    agente -->|"tools via stdio"| mcp["Servidor MCP de dengue<br/>(smart_hospitals, repo externo)"]
+    mcp --> dados[("Snapshot InfoDengue<br/>dengue em SP")]
+```
 
 **Stack:** Python 3.12 · LangGraph · langchain-ollama · langchain-mcp-adapters · PostgreSQL
 (`langgraph-checkpoint-postgres` + psycopg 3) · uv · pytest · ruff
 
-## Setup
+**Documentação:**
 
-Pré-requisitos: [uv](https://docs.astral.sh/uv/), [Ollama](https://ollama.com/) rodando com o
-modelo baixado (`ollama pull llama3.2`) e um PostgreSQL acessível.
+- [docs/architecture.md](docs/architecture.md): componentes, loop ReAct, persistência e erros
+- [docs/mcp-integration.md](docs/mcp-integration.md): servidor MCP externo, tools, atualização de
+  dados e solução de problemas
+- [DEMO.md](DEMO.md): roteiro de demonstração com conversas reais
+- [docs/acceptance-criteria.md](docs/acceptance-criteria.md): critérios de aceite do PRD e evidências
+
+## Pré-requisitos
+
+- [uv](https://docs.astral.sh/uv/) (instala o Python 3.12 se faltar)
+- [Docker](https://docs.docker.com/get-docker/) com o Compose, para o PostgreSQL (ou um PostgreSQL
+  13+ acessível)
+- [Ollama](https://ollama.com/) rodando, com um modelo que suporte tool calling
+- Git, para clonar o servidor MCP [smart_hospitals](https://github.com/kajus9138/smart_hospitals)
+
+## Quick start
 
 ```bash
-uv sync                 # cria o .venv com Python 3.12 e instala as dependências
-cp .env.example .env    # ajuste OLLAMA_*, DATABASE_URL e SMART_HOSPITALS_PATH
-docker compose up -d    # PostgreSQL 16 local, com as mesmas credenciais do .env.example
-uv run ai-agent-hospital chat  # veja a seção CLI
+# 1. Servidor MCP de dengue (repositório separado), uma vez
+git clone https://github.com/kajus9138/smart_hospitals.git ~/smart_hospitals
+(cd ~/smart_hospitals && uv sync)
+
+# 2. Serviços locais
+docker compose up -d        # PostgreSQL 16 em localhost:5432
+ollama pull llama3.2        # modelo padrão (para a demo: qwen2.5, veja abaixo)
+
+# 3. Este projeto
+uv sync                     # cria o .venv e instala as dependências
+cp .env.example .env        # e ajuste SMART_HOSPITALS_PATH=/home/<você>/smart_hospitals
+
+# 4. Conferir e conversar
+uv run ai-agent-hospital health   # ollama, database e mcp devem estar "ok"
+uv run ai-agent-hospital chat
 ```
+
+Se o `health` mostrar algum serviço `indisponível`, a linha acima da tabela diz o motivo; para o MCP,
+veja a [solução de problemas](docs/mcp-integration.md#solução-de-problemas).
+
+Para apresentações, use `OLLAMA_MODEL=qwen2.5` (`ollama pull qwen2.5`, 4,7 GB): é o modelo com que as
+conversas do [DEMO.md](DEMO.md) foram gravadas e o que erra menos ao chamar tools.
+
+## Configuração
+
+Lida de variáveis de ambiente e do `.env` (variáveis já definidas no ambiente têm prioridade):
+
+| Variável | Padrão | Para quê |
+|---|---|---|
+| `OLLAMA_MODEL` | `llama3.2` | Modelo do Ollama; precisa suportar tool calling (veja [LLM](#llm-ollama)) |
+| `OLLAMA_BASE_URL` | `http://localhost:11434` | Endereço do Ollama |
+| `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/ai_agent_hospital` | PostgreSQL das threads; o padrão é o do `docker-compose.yml` |
+| `SMART_HOSPITALS_PATH` | (nenhum) | Clone do smart_hospitals; obrigatória para o `chat` e o `health` |
+| `MCP_SERVER_COMMAND` | `uv` | Executável que sobe o servidor MCP |
+| `MCP_SERVER_ARGS` | `run --directory ${SMART_HOSPITALS_PATH} dengue-mcp` | Argumentos do servidor MCP; o cliente expande o placeholder |
+| `TEST_DATABASE_URL` | `DATABASE_URL` | Só para os testes de integração |
+
+Deixe `MCP_SERVER_ARGS` comentado no `.env`, como no `.env.example`; o porquê e como o comando do
+servidor é montado estão em [docs/mcp-integration.md](docs/mcp-integration.md#variáveis-de-ambiente).
+
+## Exemplos de perguntas
+
+Cada pergunta leva o agente a uma das tools do servidor MCP (conversas completas no
+[DEMO.md](DEMO.md)):
+
+| Pergunta | Tool |
+|---|---|
+| "Qual a situação atual da dengue em São Paulo?" | `situacao_atual` |
+| "Como está a tendência da dengue nas últimas 4 semanas?" | `tendencia` |
+| "Mostre a série histórica de julho a setembro de 2026." | `serie_historica` |
+| "Como esta semana se compara com a mesma semana dos anos anteriores?" | `comparativo_sazonal` |
+
+Perguntas de decisão ("Devo reforçar a triagem no pronto-socorro?") costumam combinar várias tools.
+Fora do escopo dos dados (leitos, bairros, outras cidades), o agente diz que a informação não está
+disponível.
+
+## Uso como biblioteca
 
 ### Banco de dados
 
@@ -70,23 +147,10 @@ asyncio.run(main())
 
 ### Servidor MCP de dengue (smart_hospitals)
 
-Os dados de dengue vêm do servidor MCP do projeto
-[smart_hospitals](https://github.com/kajus9138/smart_hospitals), que **não** fica neste repo: clone-o
-e aponte `SMART_HOSPITALS_PATH` para o clone no `.env`. O cliente sobe o servidor via stdio com
-`MCP_SERVER_COMMAND` + `MCP_SERVER_ARGS` (padrão: `uv run --directory ${SMART_HOSPITALS_PATH}
-dengue-mcp`). As tools (`situacao_atual`, `tendencia`, `serie_historica`, `comparativo_sazonal`)
-são descobertas na conexão e convertidas para tools do LangChain.
-
-Preparar o smart_hospitals (uma vez):
-
-```bash
-git clone https://github.com/kajus9138/smart_hospitals.git ~/smart_hospitals
-cd ~/smart_hospitals && uv sync
-ls data/dengue_sp_snapshot.csv     # snapshot do InfoDengue usado pelas tools
-uv run dengue-mcp                  # deve subir e ficar esperando no stdio (Ctrl+C para sair)
-```
-
-Depois, no `.env` deste projeto: `SMART_HOSPITALS_PATH=/home/<você>/smart_hospitals`.
+O cliente sobe o servidor do [smart_hospitals](https://github.com/kajus9138/smart_hospitals) via stdio
+com `MCP_SERVER_COMMAND` + `MCP_SERVER_ARGS` e descobre as tools (`situacao_atual`, `tendencia`,
+`serie_historica`, `comparativo_sazonal`) na conexão, convertendo-as para tools do LangChain.
+Preparação, montagem do comando e solução de problemas: [docs/mcp-integration.md](docs/mcp-integration.md).
 
 ```python
 from ai_agent_hospital.mcp_client import DengueMCPClient, load_langchain_tools
@@ -186,6 +250,8 @@ src/ai_agent_hospital/
   cli.py        # CLI (comando ai-agent-hospital)
   main.py       # ponto de entrada que chama a CLI
 tests/
+docs/           # arquitetura, integração MCP e critérios de aceite
+DEMO.md         # roteiro de demonstração
 ```
 
 ## Desenvolvimento

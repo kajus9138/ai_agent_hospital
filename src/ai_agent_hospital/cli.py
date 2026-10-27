@@ -58,6 +58,7 @@ class TurnRenderer:
         return _assistant_panel(self.text, "Assistente")
 
     def token(self, text: str) -> None:
+        """Acrescenta um pedaço da resposta; o primeiro troca o spinner pelo painel ao vivo."""
         if not text:
             return
         self.status.stop()
@@ -81,6 +82,7 @@ class TurnRenderer:
         self._close_text()
 
     def tool_start(self, name: str, args: Any) -> None:
+        """Mostra a tool consultada e os argumentos, e volta ao spinner."""
         self._close_text()
         self.status.stop()
         self.console.print(
@@ -89,6 +91,7 @@ class TurnRenderer:
         self.status.start()
 
     def tool_error(self, name: str) -> None:
+        """Avisa que a tool devolveu erro (o modelo recebe o erro e segue)."""
         self.console.print(
             f"[yellow]  {escape(name)} devolveu erro; o agente vai considerar isso.[/]"
         )
@@ -100,6 +103,7 @@ class TurnRenderer:
         self.text = ""
 
     def close(self) -> None:
+        """Encerra painel e spinner; chamado ao fim do turno, inclusive se ele falhar."""
         self._close_text()
         self.status.stop()
 
@@ -128,6 +132,7 @@ async def run_turn(manager: ThreadManager, thread_id: UUID, text: str, console: 
 
 
 async def read_prompt(session: PromptSession) -> str:
+    """Lê uma linha do usuário (Ctrl+D levanta EOFError, que encerra o chat)."""
     return await session.prompt_async("Você: ")
 
 
@@ -216,6 +221,7 @@ async def _save_turn(
 
 
 def render_threads(threads: list[ThreadPreview], console: Console) -> None:
+    """Tabela de threads com contagem e prévia da última mensagem."""
     if not threads:
         console.print("Nenhuma thread ainda. Comece com `chat`.")
         return
@@ -232,6 +238,7 @@ def render_threads(threads: list[ThreadPreview], console: Console) -> None:
 
 
 def render_history(messages: list[Message], console: Console) -> None:
+    """Mensagens numeradas a partir de 1 (o número é o usado no `fork --from`)."""
     if not messages:
         console.print("Thread sem mensagens.")
         return
