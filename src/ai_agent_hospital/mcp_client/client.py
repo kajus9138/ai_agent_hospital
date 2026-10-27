@@ -13,14 +13,11 @@ from mcp.client.stdio import get_default_environment
 from mcp.types import CallToolResult, Tool
 
 from ai_agent_hospital.config import Settings, get_settings
+from ai_agent_hospital.errors import MCPConnectionError
 
 logger = logging.getLogger(__name__)
 
 PATH_PLACEHOLDER = "${SMART_HOSPITALS_PATH}"
-
-
-class MCPConnectionError(Exception):
-    """Falha ao configurar, iniciar ou usar a conexão com o servidor MCP."""
 
 
 class DengueMCPClient:

@@ -2,8 +2,8 @@
 
 import asyncio
 import signal
-from collections.abc import AsyncIterator, Awaitable, Callable, Coroutine
-from contextlib import AsyncExitStack, asynccontextmanager, suppress
+from collections.abc import Awaitable, Callable, Coroutine
+from contextlib import suppress
 from typing import Annotated, Any
 from uuid import UUID
 
@@ -19,71 +19,19 @@ from rich.markup import escape
 from rich.panel import Panel
 from rich.table import Table
 
-from ai_agent_hospital.agent.checkpointer import CheckpointerError, open_checkpointer
-from ai_agent_hospital.agent.llm import check_ollama_health, get_llm
-from ai_agent_hospital.agent.react_agent import HospitalReActAgent, create_hospital_agent
 from ai_agent_hospital.agent.thread_manager import ThreadManager, ThreadNotFoundError
-from ai_agent_hospital.config import Settings, get_settings
-from ai_agent_hospital.db.connection import create_pool, init_schema
-from ai_agent_hospital.db.repository import Message, ThreadPreview, ThreadRepository
-from ai_agent_hospital.mcp_client import DengueMCPClient
-from ai_agent_hospital.mcp_client.client import MCPConnectionError
+from ai_agent_hospital.bootstrap import open_session
+from ai_agent_hospital.db.repository import Message, ThreadPreview
+from ai_agent_hospital.errors import AgentHospitalError
+from ai_agent_hospital.health import health_check
 
 EXIT_COMMANDS = {"exit", "quit", "sair"}
+EXIT_SIGTERM = 128 + signal.SIGTERM
 PREVIEW_WIDTH = 60
 
 app = typer.Typer(
     help="Agente de apoio à decisão hospitalar (dengue em São Paulo).", no_args_is_help=True
 )
-
-
-class StartupError(Exception):
-    """Algo de que a CLI depende (banco, Ollama, servidor MCP) não está disponível."""
-
-
-@asynccontextmanager
-async def open_session(
-    settings: Settings | None = None, *, with_tools: bool
-) -> AsyncIterator[ThreadManager]:
-    """ThreadManager pronto para uso, com banco, checkpointer e (se `with_tools`) o servidor MCP.
-
-    Sem tools o agente não chama o modelo nem sobe o servidor MCP: basta para listar, ler,
-    bifurcar e apagar threads. Tudo é aberto e fechado nesta task (exigência do stdio do MCP).
-    """
-    settings = settings or get_settings()
-    async with AsyncExitStack() as stack:
-        # Pools pequenos: a CLI é um usuário só, e são dois (repository e checkpointer).
-        pool = create_pool(settings.database_url, min_size=1, max_size=4)
-        stack.push_async_callback(pool.close)
-        try:
-            await pool.open(wait=True, timeout=10.0)
-            await init_schema(pool)
-            checkpointer = await stack.enter_async_context(
-                open_checkpointer(settings.database_url, min_size=1, max_size=4)
-            )
-        except CheckpointerError as exc:
-            raise StartupError(str(exc)) from exc
-        except psycopg.Error as exc:
-            raise StartupError(
-                f"Não foi possível conectar ao PostgreSQL: {exc}. Confira o DATABASE_URL e se o "
-                "banco está no ar (`docker compose up -d`)."
-            ) from exc
-
-        llm = get_llm(settings)
-        if with_tools:
-            if not await check_ollama_health(settings):
-                raise StartupError(
-                    f"Ollama indisponível em {settings.ollama_base_url} ou modelo "
-                    f"{settings.ollama_model} não baixado (`ollama pull {settings.ollama_model}`)."
-                )
-            try:
-                client = await stack.enter_async_context(DengueMCPClient.from_settings(settings))
-            except (MCPConnectionError, ValueError) as exc:
-                raise StartupError(str(exc)) from exc
-            agent = await create_hospital_agent(llm, client, checkpointer)
-        else:
-            agent = HospitalReActAgent(llm, [], checkpointer)
-        yield ThreadManager(agent, ThreadRepository(pool))
 
 
 def _format_args(args: Any) -> str:
@@ -118,6 +66,13 @@ class TurnRenderer:
             self.live.start()
         self.text += text
         self.live.update(self._panel())
+
+    def model_start(self) -> None:
+        """Nova chamada do modelo: descarta texto parcial de uma tentativa que falhou (retry)."""
+        if self.text:
+            self.text = ""
+            if self.live is not None:
+                self.live.update(self._panel())
 
     def model_end(self, message: Any) -> None:
         """Fim de uma chamada do modelo; mostra o texto se ele não veio em tokens."""
@@ -156,7 +111,9 @@ async def run_turn(manager: ThreadManager, thread_id: UUID, text: str, console: 
     try:
         async for event in events:
             kind, data = event["event"], event["data"]
-            if kind == "on_chat_model_stream":
+            if kind == "on_chat_model_start":
+                renderer.model_start()
+            elif kind == "on_chat_model_stream":
                 renderer.token(data["chunk"].text)
             elif kind == "on_chat_model_end":
                 renderer.model_end(data.get("output"))
@@ -230,6 +187,8 @@ async def run_chat(
                     "[red]O agente entrou em loop chamando ferramentas e foi interrompido. "
                     "Tente reformular a pergunta.[/]"
                 )
+            except AgentHospitalError as exc:
+                console.print(f"[red]{escape(str(exc))}[/]")
             except Exception as exc:
                 console.print(f"[red]Erro do agente: {escape(str(exc))}[/]")
             finally:
@@ -313,11 +272,39 @@ def _parse_uuid(value: str) -> UUID:
 ThreadArg = Annotated[UUID, typer.Argument(parser=_parse_uuid, help="ID da thread.")]
 
 
+async def _cancel_on_sigterm(coro: Coroutine[Any, Any, Any]) -> Any:
+    """Roda `coro` e, no SIGTERM, a cancela: os `async with` fecham pools e o servidor MCP."""
+    loop = asyncio.get_running_loop()
+    task = asyncio.current_task()
+    terminated = False
+
+    def on_sigterm() -> None:
+        nonlocal terminated
+        terminated = True
+        if task is not None:
+            task.cancel()
+
+    has_handler = False
+    with suppress(NotImplementedError, RuntimeError, ValueError):
+        loop.add_signal_handler(signal.SIGTERM, on_sigterm)
+        has_handler = True
+    try:
+        return await coro
+    except (asyncio.CancelledError, Exception):
+        # Um erro ao fechar as conexões durante o cancelamento não muda o motivo da saída.
+        if terminated:
+            raise typer.Exit(EXIT_SIGTERM) from None
+        raise
+    finally:
+        if has_handler:
+            loop.remove_signal_handler(signal.SIGTERM)
+
+
 def _run(coro: Coroutine[Any, Any, Any]) -> Any:
     """Roda a corrotina do comando, traduzindo falhas conhecidas em mensagem + exit 1."""
     try:
-        return asyncio.run(coro)
-    except (StartupError, ThreadNotFoundError, ValueError) as exc:
+        return asyncio.run(_cancel_on_sigterm(coro))
+    except (AgentHospitalError, ThreadNotFoundError, ValueError) as exc:
         err_console.print(f"[red]{escape(str(exc))}[/]")
         raise typer.Exit(1) from None
     except psycopg.Error as exc:
@@ -413,4 +400,18 @@ def delete(
         console.print("Thread apagada.")
     else:
         err_console.print(f"[red]Thread {thread_id} não encontrada.[/]")
+        raise typer.Exit(1)
+
+
+@app.command()
+def health() -> None:
+    """Verifica Ollama, PostgreSQL e servidor MCP; sai com 1 se algum estiver fora."""
+    status = _run(health_check())
+    table = Table(title="Serviços")
+    table.add_column("Serviço")
+    table.add_column("Estado")
+    for name, ok in status.items():
+        table.add_row(name, "[green]ok[/]" if ok else "[red]indisponível[/]")
+    console.print(table)
+    if not all(status.values()):
         raise typer.Exit(1)
