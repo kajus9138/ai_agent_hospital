@@ -35,6 +35,7 @@ from ai_agent_hospital.db.repository import (
     ThreadRepository,
     ThreadSummary,
 )
+from ai_agent_hospital.errors import OllamaConnectionError
 
 
 def make_console() -> Console:
@@ -251,6 +252,15 @@ async def test_ctrl_d_and_ctrl_c_at_prompt_exit(checkpointer, pool):
 NOW = datetime(2026, 10, 27, 14, 30, tzinfo=UTC)
 
 
+def test_renderer_discards_partial_text_on_model_retry():
+    renderer = cli.TurnRenderer(make_console())
+    renderer.token("Na semana 2026")  # tentativa que falhou no meio do streaming
+    renderer.model_start()  # retry
+    renderer.token("Na semana 202643.")
+    assert renderer.text == "Na semana 202643."
+    renderer.close()
+
+
 def test_render_threads_table():
     tid = uuid.uuid4()
     preview = ThreadPreview(tid, NOW, {}, 4, "linha 1\nlinha 2 " + "x" * 100, NOW)
@@ -422,7 +432,7 @@ def test_delete_asks_confirmation(fake_session):
 def test_startup_error_exits_1(monkeypatch):
     @asynccontextmanager
     async def broken_session(*args: Any, **kwargs: Any) -> AsyncIterator[None]:
-        raise cli.StartupError("Ollama indisponível")
+        raise OllamaConnectionError("Ollama indisponível")
         yield
 
     monkeypatch.setattr(cli, "open_session", broken_session)

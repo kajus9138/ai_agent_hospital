@@ -9,9 +9,10 @@ from psycopg.rows import dict_row
 
 from ai_agent_hospital.config import get_settings
 from ai_agent_hospital.db.connection import create_pool
+from ai_agent_hospital.errors import DatabaseConnectionError
 
 
-class CheckpointerError(Exception):
+class CheckpointerError(DatabaseConnectionError):
     """Falha ao conectar ou preparar as tabelas do checkpointer."""
 
 

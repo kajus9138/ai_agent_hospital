@@ -19,6 +19,7 @@ from ai_agent_hospital.agent.thread_manager import (
     to_new_message,
 )
 from ai_agent_hospital.db.repository import ThreadRepository
+from ai_agent_hospital.errors import ToolExecutionError
 
 
 def test_to_new_message_roles():
@@ -195,7 +196,7 @@ async def test_send_message_failure_keeps_agent_error_and_partial_history(checkp
     manager = ThreadManager(agent, ThreadRepository(pool))
     thread_id = await manager.create_thread()
 
-    with pytest.raises(RuntimeError, match="servidor MCP caiu"):
+    with pytest.raises(ToolExecutionError, match="tool_quebrada.*servidor MCP caiu"):
         await manager.send_message(thread_id, "Como está a dengue?")
 
     # O que o grafo gravou antes da falha (pergunta + chamada da tool) está no histórico, e a
@@ -213,7 +214,7 @@ async def test_close_pending_tool_calls_lets_conversation_continue(checkpointer,
         HospitalReActAgent(llm, [tool_quebrada], checkpointer), ThreadRepository(pool)
     )
     thread_id = await manager.create_thread()
-    with pytest.raises(RuntimeError):
+    with pytest.raises(ToolExecutionError):
         await manager.send_message(thread_id, "Como está a dengue?")
 
     assert await manager.close_pending_tool_calls(thread_id) == 0  # já fechadas; idempotente

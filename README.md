@@ -152,6 +152,7 @@ uv run ai-agent-hospital threads                 # lista as threads e a última 
 uv run ai-agent-hospital history <id>            # mensagens numeradas da thread
 uv run ai-agent-hospital fork <id> --from 4      # thread nova com as 4 primeiras mensagens
 uv run ai-agent-hospital delete <id> [--yes]     # apaga thread, histórico e checkpoints
+uv run ai-agent-hospital health                  # estado do Ollama, PostgreSQL e servidor MCP
 ```
 
 O `chat` precisa do PostgreSQL, do Ollama com o modelo baixado e do smart_hospitals; os demais
@@ -161,6 +162,16 @@ andamento. O histórico é gravado ao fim de cada turno, inclusive quando ele fa
 interrompida fica registrada com erro (`ThreadManager.close_pending_tool_calls`), e a conversa segue.
 Para voltar a um ponto anterior, use o `fork` (o número vem do `history`).
 
+### Erros e health check
+
+Se algo não sobe, o comando sai com código 1 e uma mensagem do que conferir. Os erros têm a base
+`AgentHospitalError` (`errors.py`): `DatabaseConnectionError`, `OllamaConnectionError`,
+`MCPConnectionError` e `ToolExecutionError` (tool que falha fora do protocolo, ex.: o servidor MCP
+caiu). Falhas transitórias têm novas tentativas com backoff exponencial: cada chamada do modelo
+(conexão, timeout, 502/503/504; esgotadas, viram `OllamaConnectionError`), a conexão com o banco
+(o próprio pool) e a do servidor MCP. O `health` verifica os três serviços em paralelo e sai com 1 se algum estiver fora.
+SIGTERM (ex.: `kill`) fecha pools e o servidor MCP antes de sair (código 143).
+
 ## Estrutura
 
 ```
@@ -169,6 +180,9 @@ src/ai_agent_hospital/
   db/           # persistência das threads no PostgreSQL
   mcp_client/   # comunicação com o MCP local (stdio)
   config.py     # configurações via variáveis de ambiente / .env
+  bootstrap.py  # monta banco, checkpointer, Ollama e MCP num ThreadManager (open_session)
+  errors.py     # erros da aplicação (base AgentHospitalError)
+  health.py     # health check dos serviços
   cli.py        # CLI (comando ai-agent-hospital)
   main.py       # ponto de entrada que chama a CLI
 tests/
