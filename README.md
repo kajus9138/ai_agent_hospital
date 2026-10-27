@@ -15,7 +15,26 @@ modelo baixado (`ollama pull llama3.2`) e um PostgreSQL acessível.
 ```bash
 uv sync                 # cria o .venv com Python 3.12 e instala as dependências
 cp .env.example .env    # ajuste OLLAMA_MODEL, OLLAMA_BASE_URL e DATABASE_URL
+docker compose up -d    # PostgreSQL 16 local, com as mesmas credenciais do .env.example
 uv run ai-agent-hospital
+```
+
+### Banco de dados
+
+O `docker-compose.yml` sobe um PostgreSQL 16 em `localhost:5432` (banco `ai_agent_hospital`,
+usuário/senha `postgres`), que é o `DATABASE_URL` padrão. O schema (`threads` e `messages`) está em
+`src/ai_agent_hospital/db/schema.sql` e é idempotente: `init_schema(pool)` cria o que faltar.
+
+```python
+from ai_agent_hospital.db.connection import create_pool, init_schema
+from ai_agent_hospital.db.repository import ThreadRepository
+
+async with create_pool() as pool:  # usa DATABASE_URL
+    await init_schema(pool)
+    repo = ThreadRepository(pool)
+    thread_id = await repo.create_thread({"title": "Ocupação de leitos"})
+    await repo.add_message(thread_id, "user", "Como está a dengue em SP?")
+    messages = await repo.get_thread_messages(thread_id)
 ```
 
 ## Estrutura
@@ -36,6 +55,10 @@ tests/
 uv run pytest                                      # testes
 uv run ruff check . && uv run ruff format --check . # lint e formatação
 ```
+
+Os testes marcados com `integration` (`tests/test_db.py`) usam `TEST_DATABASE_URL` (ou `DATABASE_URL`)
+e são pulados se o PostgreSQL não estiver acessível. Cada teste roda num schema temporário que é
+apagado no fim, então é seguro apontá-los para o banco de desenvolvimento.
 
 ## Workflow de desenvolvimento (template)
 

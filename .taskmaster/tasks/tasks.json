@@ -17,14 +17,15 @@
         "id": "2",
         "title": "PostgreSQL Database Schema and Connection",
         "description": "Design and implement PostgreSQL schema for storing conversation threads and messages, with connection pooling and async support.",
-        "details": "1. Create docker-compose.yml for local PostgreSQL:\n   ```yaml\n   services:\n     postgres:\n       image: postgres:16\n       environment:\n         POSTGRES_DB: hospital_agent\n         POSTGRES_USER: agent\n         POSTGRES_PASSWORD: agent_pwd\n       ports:\n         - '5432:5432'\n       volumes:\n         - pgdata:/var/lib/postgresql/data\n   ```\n\n2. Create schema in src/ai_agent_hospital/db/schema.sql:\n   ```sql\n   CREATE TABLE threads (\n     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n     created_at TIMESTAMPTZ DEFAULT NOW(),\n     metadata JSONB DEFAULT '{}'\n   );\n   \n   CREATE TABLE messages (\n     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n     thread_id UUID REFERENCES threads(id) ON DELETE CASCADE,\n     role VARCHAR(20) NOT NULL,  -- 'user', 'assistant', 'tool'\n     content TEXT NOT NULL,\n     tool_calls JSONB,\n     created_at TIMESTAMPTZ DEFAULT NOW()\n   );\n   \n   CREATE INDEX idx_messages_thread ON messages(thread_id, created_at);\n   ```\n\n3. Implement db/connection.py:\n   - Async connection pool using asyncpg or psycopg pool\n   - Context manager for transactions\n   - Config from DATABASE_URL env var\n\n4. Implement db/repository.py:\n   - create_thread() -> thread_id\n   - add_message(thread_id, role, content, tool_calls=None)\n   - get_thread_messages(thread_id) -> List[Message]\n   - list_threads() -> List[Thread]",
+        "details": "1. Create docker-compose.yml for local PostgreSQL:\n   ```yaml\n   services:\n     postgres:\n       image: postgres:16\n       environment:\n         POSTGRES_DB: hospital_agent\n         POSTGRES_USER: agent\n         POSTGRES_PASSWORD: agent_pwd\n       ports:\n         - '5432:5432'\n       volumes:\n         - pgdata:/var/lib/postgresql/data\n   ```\n\n2. Create schema in src/ai_agent_hospital/db/schema.sql:\n   ```sql\n   CREATE TABLE threads (\n     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n     created_at TIMESTAMPTZ DEFAULT NOW(),\n     metadata JSONB DEFAULT '{}'\n   );\n   \n   CREATE TABLE messages (\n     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),\n     thread_id UUID REFERENCES threads(id) ON DELETE CASCADE,\n     role VARCHAR(20) NOT NULL,  -- 'user', 'assistant', 'tool'\n     content TEXT NOT NULL,\n     tool_calls JSONB,\n     created_at TIMESTAMPTZ DEFAULT NOW()\n   );\n   \n   CREATE INDEX idx_messages_thread ON messages(thread_id, created_at);\n   ```\n\n3. Implement db/connection.py:\n   - Async connection pool using asyncpg or psycopg pool\n   - Context manager for transactions\n   - Config from DATABASE_URL env var\n\n4. Implement db/repository.py:\n   - create_thread() -> thread_id\n   - add_message(thread_id, role, content, tool_calls=None)\n   - get_thread_messages(thread_id) -> List[Message]\n   - list_threads() -> List[Thread]\n<info added on 2026-10-26T21:07:03.003Z>\nImplementation Notes:\n\n- docker-compose.yml: Uses postgres:16 image with credentials matching .env.example (POSTGRES_USER=postgres, POSTGRES_PASSWORD=postgres, POSTGRES_DB=ai_agent_hospital). Includes healthcheck for container readiness.\n\n- src/ai_agent_hospital/db/schema.sql: Idempotent DDL with IF NOT EXISTS clauses. Adds NOT NULL constraints to created_at and metadata. Includes CHECK constraint on role column (user/assistant/tool). Uses clock_timestamp() instead of NOW() for messages.created_at to preserve insertion order within the same transaction.\n\n- src/ai_agent_hospital/db/connection.py: create_pool() with open=False (explicit async opening required). load_schema() uses importlib.resources.files for package-relative path. init_schema() applies DDL. transaction() context manager with auto-commit/rollback.\n\n- src/ai_agent_hospital/db/repository.py: Thread and Message frozen dataclasses. ThreadRepository uses psycopg class_row factory and Jsonb adapter for typed results.\n\n- tests/test_db.py: Integration tests run in isolated temporary schemas (CREATE SCHEMA test_<uuid>, DROP SCHEMA CASCADE). Tests skip gracefully when PostgreSQL is unavailable. Covers: idempotent schema init, thread CRUD, message ordering, clock_timestamp behavior, CHECK constraint on role, foreign key enforcement, cascade delete, and transaction rollback.\n\n- Validation: 25 tests passing against postgres:16 (via docker run, as Docker Compose plugin is not installed on this machine).\n</info added on 2026-10-26T21:07:03.003Z>",
         "testStrategy": "Integration tests: (1) Start postgres via docker-compose, (2) Run schema migration, (3) Test CRUD operations: create thread, add messages, retrieve thread history, (4) Verify foreign key constraints work (delete thread cascades to messages)",
         "priority": "high",
         "dependencies": [
           "1"
         ],
-        "status": "pending",
-        "subtasks": []
+        "status": "done",
+        "subtasks": [],
+        "updatedAt": "2026-10-26T21:08:57.829Z"
       },
       {
         "id": "3",
@@ -394,9 +395,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-10-26T20:50:28.025Z",
+      "lastModified": "2026-10-26T21:08:57.829Z",
       "taskCount": 10,
-      "completedCount": 1,
+      "completedCount": 2,
       "tags": [
         "master"
       ]
