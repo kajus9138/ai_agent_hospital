@@ -1,0 +1,285 @@
+# Ontologia leve da dengue em São Paulo (capital) para agentes de IA.
+# Carregue este arquivo no contexto do agente junto com o MCP server do projeto:
+# as tools trazem os valores atuais; este arquivo diz como interpretá-los.
+# Escrito à mão a partir do notebook versionado, das notas de decisão e do módulo de dados.
+
+metadados:
+  nome: ontologia-dengue-sp
+  versao: 1.0.0
+  fonte: InfoDengue
+  municipio: São Paulo (capital)
+  geocodigo: 3550308
+  origem:
+    - notebooks/analise_dengue_sp.ipynb
+    - memories/decisoes/Notebook de análise exploratória - decisões.md
+    - src/smart_hospitals/data/indicators.py
+  data_referencia: "2026-10-04"  # início da SE mais recente do snapshot usado nos achados
+  valido_ate_se: 202640  # achados valem até esta SE; snapshot mais novo exige revisão
+
+# Conceitos (classes). coluna: coluna do snapshot; tools: tools do MCP que expõem o conceito.
+conceitos:
+  - id: municipio
+    rotulo: Município
+    definicao: Município analisado. Nesta versão, só São Paulo (capital).
+  - id: semana_epidemiologica
+    rotulo: Semana epidemiológica (SE)
+    definicao: >-
+      Semana de domingo a sábado, no formato AAAASS (ex.: 202640). data_iniSE é o domingo
+      de início. Um ano tem 52 ou 53 SEs. situacao_atual devolve só data_iniSE, como
+      data_referencia.
+    faixa: SE 1 a 53 em cada ano
+    coluna: [SE, data_iniSE]
+    tools: [situacao_atual, tendencia, serie_historica, comparativo_sazonal]
+  - id: ano
+    rotulo: Ano epidemiológico
+    definicao: Ano da SE (SE // 100). Ano completo tem 52 ou 53 SEs no snapshot.
+    tools: [comparativo_sazonal]
+  - id: casos_notificados
+    rotulo: Casos notificados
+    definicao: >-
+      Casos registrados até a data do snapshot. Nas semanas recentes ficam abaixo do real
+      por causa do atraso de notificação.
+    unidade: casos/semana
+    coluna: [casos]
+    tools: [situacao_atual, serie_historica]
+  - id: casos_estimados
+    rotulo: Casos estimados (nowcast)
+    definicao: >-
+      Estimativa do InfoDengue para o total de casos da semana, corrigindo o atraso de
+      notificação. É a medida de referência do sistema.
+    unidade: casos/semana
+    coluna: [casos_est]
+    tools: [situacao_atual, tendencia, serie_historica, comparativo_sazonal]
+  - id: intervalo_do_nowcast
+    rotulo: Intervalo do nowcast
+    definicao: >-
+      Limites mínimo e máximo de casos_est. Só existe incerteza onde casos_est_max >
+      casos_est_min; nas semanas consolidadas min = max = casos_est ou o max vem vazio.
+    unidade: casos/semana
+    coluna: [casos_est_min, casos_est_max]
+    tools: [situacao_atual, serie_historica]
+  - id: numero_de_reproducao
+    rotulo: Número de reprodução (Rt)
+    definicao: >-
+      Média de novos casos gerados por cada caso. Rt > 1 indica transmissão em crescimento;
+      Rt < 1, em queda.
+    unidade: adimensional
+    faixa: ">= 0"
+    coluna: [Rt]
+    tools: [situacao_atual, tendencia, serie_historica]
+  - id: probabilidade_rt_maior_que_1
+    rotulo: Probabilidade de Rt > 1 (p_rt1)
+    definicao: Probabilidade estimada de a transmissão estar em crescimento (Rt > 1).
+    unidade: probabilidade
+    faixa: 0 a 1
+    coluna: [p_rt1]
+    tools: [situacao_atual, tendencia]
+  - id: nivel_de_alerta
+    rotulo: Nível de alerta
+    definicao: Nível de alerta do InfoDengue para a semana, de 1 (verde) a 4 (vermelho).
+    faixa: [verde, amarelo, laranja, vermelho]
+    coluna: [nivel]
+    tools: [situacao_atual, tendencia, serie_historica]
+  - id: incidencia_100k
+    rotulo: Incidência por 100 mil habitantes
+    definicao: >-
+      Casos estimados (casos_est) da semana por 100 mil habitantes, calculada pelo
+      InfoDengue. Já incorpora a correção do atraso; não corrija de novo.
+    unidade: casos/100 mil hab./semana
+    coluna: [p_inc100k]
+    tools: [situacao_atual]
+  - id: tendencia
+    rotulo: Tendência
+    definicao: >-
+      Direção da curva nas últimas N semanas (padrão 4), a partir das médias de Rt e p_rt1.
+      Ver regras tendencia_*.
+    faixa: [alta, estavel, queda]
+    tools: [tendencia]
+  - id: comparativo_sazonal
+    rotulo: Comparativo sazonal
+    definicao: >-
+      casos_est de uma SE no ano de referência contra a mesma SE nos anos anteriores
+      (média, mínimo e máximo).
+    tools: [comparativo_sazonal]
+  - id: ano_de_surto
+    rotulo: Ano de surto
+    definicao: >-
+      Ano completo cujo total de casos_est passa de 2× a mediana anual dos anos completos.
+      Conceito da análise; não é exposto pelo MCP.
+  - id: janela_sazonal
+    rotulo: Janela sazonal
+    definicao: >-
+      SEs 10 a 19 (março a meados de maio), que concentram a maior parte dos casos do ano.
+      Conceito da análise; não é exposto pelo MCP.
+    faixa: SE 10 a 19
+  - id: atraso_de_notificacao
+    rotulo: Atraso de notificação
+    definicao: >-
+      Diferença entre casos estimados e notificados nas semanas recentes, porque os casos
+      ainda estão sendo registrados.
+
+relacoes:
+  - {de: casos_estimados, tipo: estima, para: casos_notificados}
+  - {de: intervalo_do_nowcast, tipo: delimita, para: casos_estimados}
+  - {de: numero_de_reproducao, tipo: antecipa, para: casos_estimados}  # crescimento, não quantidade
+  - {de: probabilidade_rt_maior_que_1, tipo: antecipa, para: casos_estimados}
+  - {de: tendencia, tipo: derivada_de, para: numero_de_reproducao}
+  - {de: tendencia, tipo: derivada_de, para: probabilidade_rt_maior_que_1}
+  - {de: ano_de_surto, tipo: classifica, para: ano}
+  - {de: nivel_de_alerta, tipo: classifica, para: semana_epidemiologica}
+  - {de: incidencia_100k, tipo: normaliza, para: casos_estimados}
+  - {de: comparativo_sazonal, tipo: compara, para: casos_estimados}
+  - {de: janela_sazonal, tipo: agrupa, para: semana_epidemiologica}
+  - {de: atraso_de_notificacao, tipo: afeta, para: casos_notificados}
+
+# Regras determinísticas, iguais às do módulo de dados (src/smart_hospitals/data/indicators.py).
+regras:
+  - id: tendencia_alta
+    descricao: Tendência de alta nas últimas N semanas (parâmetro semanas da tool, padrão 4).
+    expressao: "media(Rt, N) > 1.1 e media(p_rt1, N) > 0.7"
+    parametros: {semanas_padrao: 4, rt_alta: 1.1, p_rt1_alta: 0.7}
+    referencia_codigo: calcular_tendencia (RT_ALTA, P_RT1_ALTA)
+  - id: tendencia_queda
+    descricao: Tendência de queda, avaliada só se não for alta.
+    expressao: "media(Rt, N) < 0.9"
+    parametros: {semanas_padrao: 4, rt_queda: 0.9}
+    referencia_codigo: calcular_tendencia (RT_QUEDA)
+  - id: tendencia_estavel
+    descricao: Qualquer caso que não seja alta nem queda.
+    expressao: "nem tendencia_alta nem tendencia_queda"
+    referencia_codigo: calcular_tendencia
+  - id: nivel_alerta_mapeamento
+    descricao: Código numérico do InfoDengue para o nome do nível de alerta.
+    mapeamento: {1: verde, 2: amarelo, 3: laranja, 4: vermelho}
+    referencia_codigo: LEVEL_MAP
+  - id: comparativo_sazonal
+    descricao: >-
+      Ano de referência é o da SE mais recente. Média, mínimo e máximo usam só anos
+      anteriores a ele.
+    referencia_codigo: comparativo_sazonal
+  - id: variacao_semanal
+    descricao: Variação percentual de casos_est frente à semana anterior (não usa notificados).
+    expressao: "(casos_est[t] - casos_est[t-1]) / casos_est[t-1] * 100"
+    excecao: >-
+      Vale 0.0 quando casos_est[t-1] <= 0 ou só há uma semana; nesse caso 0.0 não
+      significa estabilidade.
+    referencia_codigo: calcular_situacao_atual
+  - id: intervalo_nowcast
+    descricao: Só há intervalo de incerteza onde casos_est_max > casos_est_min.
+  - id: valores_ausentes
+    descricao: None significa "não informado" e nunca é convertido em 0.
+  - id: sem_previsao_numerica
+    descricao: O sistema não prevê números de casos futuros; indica só direção e contexto.
+
+# Achados empíricos do notebook versionado (snapshot até a SE 202640). São estáticos.
+achados:
+  - id: cobertura
+    afirmacao: A série vai de 2010-01-03 a 2026-10-04 sem semanas faltando.
+    evidencia: {semanas: 875, se_inicial: 201001, se_final: 202640, anos_com_53_se: [2014, 2020, 2025]}
+    metodo: Contagem de SEs e intervalo de 7 dias entre semanas consecutivas.
+    origem: notebook, seção 1
+    valido_ate_se: 202640
+    limitacoes: Vale para o snapshot versionado; um novo snapshot pode mudar a contagem.
+    implicacao: Séries e comparações históricas não precisam tratar semanas faltando.
+  - id: lacunas
+    afirmacao: Só casos_est_max tem valores vazios.
+    evidencia: {coluna: casos_est_max, semanas_sem_valor: 40, anos: [2015, 2024, 2025]}
+    metodo: Contagem de valores vazios por coluna obrigatória.
+    origem: notebook, seção 1
+    valido_ate_se: 202640
+    limitacoes: Nessas semanas o limite superior é desconhecido, não zero.
+    implicacao: Diga "não informado" quando casos_est_max vier None.
+  - id: intervalo_nowcast
+    afirmacao: >-
+      Só as 10 SEs mais recentes têm intervalo do nowcast; nas consolidadas min = max =
+      casos_est ou o max vem vazio.
+    evidencia: {se_inicial: 202631, se_final: 202640, semanas: 10}
+    metodo: Semanas com casos_est_max > casos_est_min.
+    origem: notebook, seções 1 e 6.1
+    valido_ate_se: 202640
+    limitacoes: A quantidade de semanas em nowcast muda a cada atualização do InfoDengue.
+    implicacao: Apresente a incerteza só nas semanas recentes; o intervalo se alarga na última SE.
+  - id: surtos
+    afirmacao: >-
+      Seis anos foram de surto; 2024 foi de longe o maior, com 1,26 milhão de casos estimados.
+    evidencia:
+      limiar_casos_ano: 46406
+      anos_de_surto: [2014, 2015, 2019, 2023, 2024, 2025]
+      casos_estimados_2024: 1263604
+    metodo: Total anual de casos_est; limiar de 2× a mediana anual dos anos completos.
+    origem: notebook, seções 1 e 2
+    valido_ate_se: 202640
+    limitacoes: >-
+      Limiar definido na análise exploratória, não é critério oficial de epidemia. Só anos
+      completos são classificados; 2026 é parcial e fica de fora.
+    implicacao: >-
+      Médias históricas são puxadas por 2024; ao comparar com o histórico, mencione que
+      anos de surto inflam a média.
+  - id: sazonalidade
+    afirmacao: >-
+      As SEs 10 a 19 (março a meados de maio) concentram ~44% dos casos do ano; o segundo
+      semestre é sempre baixo.
+    evidencia: {semanas: [10, 19], percentual_mediano: 44}
+    metodo: Peso de cada SE no total anual; mediana dos anos completos.
+    origem: notebook, seção 3
+    valido_ate_se: 202640
+    limitacoes: Surtos deslocam a curva para cima sem mudar a janela; é padrão, não garantia.
+    implicacao: >-
+      Situe a semana atual em relação à janela sazonal: alta fora dela é atípica; dentro
+      dela é esperada.
+  - id: rt_antecipacao
+    afirmacao: >-
+      Rt e p_rt1 têm correlação positiva moderada com o crescimento de casos_est nas
+      semanas seguintes, maior entre 3 e 5 semanas.
+    evidencia:
+      lags_semanas: [1, 2, 3, 4, 5, 6, 7, 8]
+      spearman_rt: [0.31, 0.37, 0.41, 0.41, 0.41, 0.41, 0.38, 0.35]
+      spearman_p_rt1: [0.33, 0.39, 0.43, 0.44, 0.43, 0.42, 0.39, 0.35]
+    metodo: >-
+      Spearman entre o indicador na SE t e a variação log de casos_est entre t e t + lag;
+      exclui as SEs com Rt = 0.
+    origem: notebook, seção 4
+    valido_ate_se: 202640
+    limitacoes: Correlação moderada; indica direção, não quantidade de casos.
+    implicacao: >-
+      Use Rt e p_rt1 para dizer se a curva tende a subir nas próximas semanas, nunca para
+      estimar quantos casos virão.
+  - id: rt_aquecimento
+    afirmacao: Rt = 0 nas 5 primeiras SEs de 2010, por aquecimento do estimador.
+    evidencia: {se_inicial: 201001, se_final: 201005, rt: 0}
+    metodo: Inspeção da série de Rt.
+    origem: notebook, seção 4
+    valido_ate_se: 202640
+    limitacoes: Essas semanas foram excluídas da análise de correlação.
+    implicacao: Não interprete Rt = 0 no início da série como ausência de transmissão.
+  - id: distribuicao_alertas
+    afirmacao: Mais da metade das semanas é verde; 2024 passou praticamente o ano todo em vermelho.
+    evidencia: {percentual_semanas_verde: 53, ano_vermelho: 2024}
+    metodo: Contagem de semanas por nível de alerta, no total e por ano.
+    origem: notebook, seção 4
+    valido_ate_se: 202640
+    limitacoes: Distribuição dominada pelos anos de surto nos níveis altos.
+    implicacao: Nível laranja ou vermelho é incomum fora de anos de surto e merece destaque.
+  - id: atraso_notificacao
+    afirmacao: >-
+      Na SE mais recente os notificados são bem menores que os estimados, o que dá falsa
+      impressão de queda.
+    evidencia: {se: 202640, notificados: 352, estimados: 1161, intervalo: [582, 3114]}
+    metodo: Comparação de casos e casos_est na última SE do snapshot.
+    origem: notebook, seção 5
+    valido_ate_se: 202640
+    limitacoes: Os valores exatos mudam a cada snapshot; o padrão se repete.
+    implicacao: >-
+      Nas semanas recentes, responda com casos_est e intervalo, não com notificados.
+
+orientacoes_agente:
+  - Cite sempre a data_referencia devolvida pelas tools.
+  - Nas semanas recentes, use casos_est com o intervalo do nowcast, não casos notificados.
+  - Trate Rt e p_rt1 como direção da tendência, não como previsão de quantidade.
+  - Contextualize a semana atual com a janela sazonal (SE 10 a 19) e com o comparativo sazonal.
+  - Ao usar o comparativo sazonal, lembre que a média histórica é inflada pelos anos de surto.
+  - Não transforme correlação em previsão numérica de casos futuros.
+  - Quando um valor vier None, diga "não informado"; nunca trate como zero.
+  - >-
+    Se a data_referencia das tools for posterior à data_referencia destes metadados (SE 202640),
+    avise que os achados podem estar desatualizados.

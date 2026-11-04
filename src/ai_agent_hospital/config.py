@@ -23,6 +23,16 @@ class Settings:
     smart_hospitals_path: str | None = None
     mcp_server_command: str = DEFAULT_MCP_SERVER_COMMAND
     mcp_server_args: str = DEFAULT_MCP_SERVER_ARGS
+    # Ontologias (YAML) somadas ao system prompt. Diretório None = padrão `ontologies/`, que pode
+    # não existir; um diretório definido de propósito precisa existir. Lista None = todos os .yaml.
+    ontologies_dir: str | None = None
+    ontologies: tuple[str, ...] | None = None
+
+
+def parse_ontologies(value: str | None) -> tuple[str, ...] | None:
+    """Lista separada por vírgula; vazia ou ausente vira None (carregar todos os .yaml)."""
+    names = tuple(name.strip() for name in (value or "").split(",") if name.strip())
+    return names or None
 
 
 def get_settings() -> Settings:
@@ -35,4 +45,6 @@ def get_settings() -> Settings:
         smart_hospitals_path=os.getenv("SMART_HOSPITALS_PATH") or None,
         mcp_server_command=os.getenv("MCP_SERVER_COMMAND", DEFAULT_MCP_SERVER_COMMAND),
         mcp_server_args=os.getenv("MCP_SERVER_ARGS", DEFAULT_MCP_SERVER_ARGS),
+        ontologies_dir=os.getenv("ONTOLOGIES_DIR") or None,
+        ontologies=parse_ontologies(os.getenv("ONTOLOGIES")),
     )

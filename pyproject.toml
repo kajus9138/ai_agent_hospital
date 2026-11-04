@@ -16,6 +16,7 @@ dependencies = [
     "prompt-toolkit>=3.0.53",
     "psycopg[binary,pool]>=3.3.6",
     "python-dotenv>=1.2.4",
+    "pyyaml>=6.0",
     "rich>=15.0.0",
     "typer>=0.27.3",
 ]
