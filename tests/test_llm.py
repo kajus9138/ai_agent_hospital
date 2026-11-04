@@ -23,11 +23,13 @@ def test_get_llm_uses_settings():
     assert model.model == "llama3.2"
     assert model.base_url == "http://ollama:11434"
     assert model.temperature == DEFAULT_TEMPERATURE
+    assert model.num_ctx == config.DEFAULT_OLLAMA_NUM_CTX
 
 
 def test_get_llm_kwargs_override():
-    model = get_llm(SETTINGS, model="qwen2.5", temperature=0)
+    model = get_llm(SETTINGS, model="qwen2.5", temperature=0, num_ctx=8192)
     assert model.model == "qwen2.5"
+    assert model.num_ctx == 8192
     assert model.temperature == 0
 
 
