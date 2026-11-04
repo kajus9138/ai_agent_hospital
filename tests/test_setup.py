@@ -58,6 +58,8 @@ def no_dotenv(monkeypatch):
         "SMART_HOSPITALS_PATH",
         "MCP_SERVER_COMMAND",
         "MCP_SERVER_ARGS",
+        "ONTOLOGIES_DIR",
+        "ONTOLOGIES",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -67,6 +69,8 @@ def test_settings_defaults(no_dotenv):
     assert settings.ollama_model == config.DEFAULT_OLLAMA_MODEL
     assert settings.ollama_base_url == config.DEFAULT_OLLAMA_BASE_URL
     assert settings.database_url == config.DEFAULT_DATABASE_URL
+    assert settings.ontologies_dir is None
+    assert settings.ontologies is None
 
 
 def test_settings_env_override(no_dotenv, monkeypatch):
@@ -77,3 +81,20 @@ def test_settings_env_override(no_dotenv, monkeypatch):
     assert settings == config.Settings(
         "qwen2.5", "http://ollama:11434", "postgresql://u:p@db:5432/x"
     )
+
+
+def test_settings_ontologies_override(no_dotenv, monkeypatch):
+    monkeypatch.setenv("ONTOLOGIES_DIR", "/srv/ontologias")
+    monkeypatch.setenv("ONTOLOGIES", " dengue_sp.yaml , ,leitos.yaml,")
+    settings = config.get_settings()
+    assert settings.ontologies_dir == "/srv/ontologias"
+    assert settings.ontologies == ("dengue_sp.yaml", "leitos.yaml")
+
+
+@pytest.mark.parametrize("value", ["", " ", " , "])
+def test_settings_empty_ontologies_loads_all(no_dotenv, monkeypatch, value):
+    monkeypatch.setenv("ONTOLOGIES_DIR", "")
+    monkeypatch.setenv("ONTOLOGIES", value)
+    settings = config.get_settings()
+    assert settings.ontologies_dir is None
+    assert settings.ontologies is None

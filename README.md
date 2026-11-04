@@ -73,6 +73,8 @@ Lida de variáveis de ambiente e do `.env` (variáveis já definidas no ambiente
 | `SMART_HOSPITALS_PATH` | (nenhum) | Clone do smart_hospitals; obrigatória para o `chat` e o `health` |
 | `MCP_SERVER_COMMAND` | `uv` | Executável que sobe o servidor MCP |
 | `MCP_SERVER_ARGS` | `run --directory ${SMART_HOSPITALS_PATH} dengue-mcp` | Argumentos do servidor MCP; o cliente expande o placeholder |
+| `ONTOLOGIES_DIR` | `ontologies/` | Diretório das ontologias (YAML) somadas ao prompt do agente; se definida, precisa existir |
+| `ONTOLOGIES` | (todos os `.yaml` do diretório) | Ontologias a carregar, separadas por vírgula (ex.: `dengue_sp.yaml`) |
 | `TEST_DATABASE_URL` | `DATABASE_URL` | Só para os testes de integração |
 
 Deixe `MCP_SERVER_ARGS` comentado no `.env`, como no `.env.example`; o porquê e como o comando do

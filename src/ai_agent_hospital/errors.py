@@ -33,3 +33,37 @@ class ToolExecutionError(AgentHospitalError):
             "caiu, reinicie o chat."
         )
         self.tool_name = tool_name
+
+
+class OntologyError(AgentHospitalError):
+    """Falha ao carregar as ontologias (YAML) que entram no system prompt."""
+
+
+class OntologyDirectoryNotFoundError(OntologyError):
+    """O diretório de ontologias definido em ONTOLOGIES_DIR não existe."""
+
+    def __init__(self, path: str) -> None:
+        super().__init__(
+            f"O diretório de ontologias '{path}' não existe. Confira ONTOLOGIES_DIR no .env."
+        )
+        self.path = path
+
+
+class OntologyFileNotFoundError(OntologyError):
+    """Uma ontologia listada em ONTOLOGIES não existe no diretório."""
+
+    def __init__(self, filename: str, directory: str) -> None:
+        super().__init__(
+            f"A ontologia '{filename}' não foi encontrada em '{directory}'. Confira ONTOLOGIES "
+            "no .env."
+        )
+        self.filename = filename
+        self.directory = directory
+
+
+class OntologyParseError(OntologyError):
+    """O arquivo de ontologia não é um YAML válido."""
+
+    def __init__(self, filename: str, cause: BaseException) -> None:
+        super().__init__(f"A ontologia '{filename}' não é um YAML válido: {cause}")
+        self.filename = filename
