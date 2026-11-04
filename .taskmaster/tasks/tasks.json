@@ -461,7 +461,7 @@
         "id": 15,
         "title": "Carregamento das ontologias e montagem do prompt",
         "description": "Criar src/ai_agent_hospital/agent/ontology.py com funções para carregar, validar e formatar arquivos de ontologia do diretório configurado, além de estender agent/prompts.py para montar o prompt de sistema completo combinando o prompt base com as ontologias carregadas.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [
           "11"
         ],
@@ -492,20 +492,21 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-11-04T18:04:32.669Z"
+        "updatedAt": "2026-11-04T18:56:11.950Z"
       },
       {
         "id": 18,
         "title": "Integrate ontology loading into agent bootstrap",
         "description": "Update bootstrap.py and react_agent.py to load ontologies at startup and pass the assembled prompt to the agent, maintaining backward compatibility when no ontologies exist.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "15"
         ],
         "priority": "high",
-        "details": "1. Update `bootstrap.py` open_session():\n   - Import load_ontologies and build_system_prompt\n   - After settings validation, call load_ontologies(settings)\n   - Call build_system_prompt(ontologies) to get final prompt\n   - Pass system_prompt to create_hospital_agent\n\n2. Update `create_hospital_agent` signature in react_agent.py:\n   - Add optional `system_prompt: str | None = None` parameter\n   - Pass to HospitalReActAgent, defaulting to HOSPITAL_SYSTEM_PROMPT if None\n\nPseudo-code for bootstrap.py:\n```python\nfrom ai_agent_hospital.agent.ontology import load_ontologies\nfrom ai_agent_hospital.agent.prompts import build_system_prompt\n\n@asynccontextmanager\nasync def open_session(...):\n    settings = settings or get_settings()\n    \n    # Load ontologies early to fail fast on config errors\n    ontologies = load_ontologies(settings)\n    system_prompt = build_system_prompt(ontologies)\n    \n    # ... existing code ...\n    \n    if with_tools:\n        agent = await create_hospital_agent(\n            llm, client, checkpointer, system_prompt=system_prompt\n        )\n    else:\n        agent = HospitalReActAgent(llm, [], checkpointer, system_prompt=system_prompt)\n```",
+        "details": "1. Update `bootstrap.py` open_session():\n   - Import load_ontologies and build_system_prompt\n   - After settings validation, call load_ontologies(settings)\n   - Call build_system_prompt(ontologies) to get final prompt\n   - Pass system_prompt to create_hospital_agent\n\n2. Update `create_hospital_agent` signature in react_agent.py:\n   - Add optional `system_prompt: str | None = None` parameter\n   - Pass to HospitalReActAgent, defaulting to HOSPITAL_SYSTEM_PROMPT if None\n\nPseudo-code for bootstrap.py:\n```python\nfrom ai_agent_hospital.agent.ontology import load_ontologies\nfrom ai_agent_hospital.agent.prompts import build_system_prompt\n\n@asynccontextmanager\nasync def open_session(...):\n    settings = settings or get_settings()\n    \n    # Load ontologies early to fail fast on config errors\n    ontologies = load_ontologies(settings)\n    system_prompt = build_system_prompt(ontologies)\n    \n    # ... existing code ...\n    \n    if with_tools:\n        agent = await create_hospital_agent(\n            llm, client, checkpointer, system_prompt=system_prompt\n        )\n    else:\n        agent = HospitalReActAgent(llm, [], checkpointer, system_prompt=system_prompt)\n```\n<info added on 2026-11-04T19:15:32.491Z>\nImplementation notes for bootstrap.load_system_prompt(settings): loads ontologies, builds the system prompt, and logs its size. open_session only invokes load_system_prompt when with_tools=True and does so before the Ollama health check so that local configuration errors fail first. create_hospital_agent now accepts an optional system_prompt parameter. End-to-end tests with a real Ollama instance use the prompt with ontologies loaded: results remain consistent (the Zona Leste xfail is unchanged), but the test suite went from 4.6 to 13 minutes total. First question takes 413 seconds due to qwen2.5 reload with num_ctx=16384 plus approximately 5k tokens of system prompt processed on CPU; subsequent questions range from 30 to 143 seconds. Coverage for ontology.py and prompts.py is 100%.\n</info added on 2026-11-04T19:15:32.491Z>",
         "testStrategy": "1. Unit test: agent receives custom prompt when ontologies loaded\n2. Unit test: agent uses default prompt when no ontologies directory\n3. Integration test: full bootstrap with ontologies/ directory works\n4. Integration test: ontology errors prevent agent startup with clear message\n5. Test backward compatibility: existing tests still pass without ontologies\n6. Regression gate: entire existing test suite passes without regressions (`uv run pytest`)\n7. Coverage gate: test coverage for `agent/ontology.py` must be above 90%\n8. Lint/format gate: `uv run ruff check . && uv run ruff format --check .` must pass with no errors",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-11-04T18:56:14.090Z"
       },
       {
         "id": 20,
@@ -523,13 +524,13 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-11-04T18:04:32.670Z",
+      "lastModified": "2026-11-04T18:56:14.090Z",
       "taskCount": 14,
-      "completedCount": 11,
+      "completedCount": 12,
       "tags": [
         "master"
       ],
-      "created": "2026-11-04T18:19:53.427Z",
+      "created": "2026-11-04T19:15:07.572Z",
       "description": "Tasks for master context"
     }
   }
