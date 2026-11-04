@@ -1,0 +1,61 @@
+# PRD - Ontologias no prompt do agente
+## 1. Contexto
+O agente ReAct do ai_agent_hospital usa hoje um system prompt fixo (`agent/prompts.py`), que descreve o escopo
+dos dados de dengue e as orientações de uso. Para que o agente use o vocabulário e as relações do domínio
+hospitalar de forma consistente, queremos acrescentar ao prompt uma ontologia descrita em YAML.
+A primeira ontologia já existe e será colocada no projeto; outras devem poder ser adicionadas depois sem mudar
+código.
+
+## 2. Objetivo
+Carregar uma ou mais ontologias em YAML de um diretório próprio do projeto e incluí-las no system prompt do
+agente, mantendo o prompt atual como base.
+
+## 3. Usuário-alvo
+- Tomador de decisão em um hospital inteligente: recebe respostas que usam os conceitos e termos da ontologia.
+- Desenvolvedor/mantenedor da POC: adiciona, troca ou remove ontologias editando arquivos YAML.
+
+## 4. Escopo (nesta versão)
+- Diretório `ontologies/` na raiz do projeto, versionado no Git, para guardar os arquivos `.yaml` das ontologias.
+- Mover a ontologia inicial `dengue_sp.yaml` (hoje na raiz do projeto, ~14 KB, ~4 mil tokens) para
+  `ontologies/dengue_sp.yaml`. Ela descreve conceitos, colunas e tools do MCP de dengue e diz como
+  interpretar os valores retornados pelas tools.
+- Módulo que lê os arquivos YAML do diretório, valida que são YAML bem formado e os inclui no prompt como
+  estão, sem resumir (seção "## Ontologia", com o `metadados.nome` de cada ontologia ou o nome do arquivo).
+- Montagem do system prompt: prompt base atual + ontologias carregadas. Sem ontologias, o prompt fica igual
+  ao de hoje.
+- Configuração por variável de ambiente (documentada no README e no `.env.example`):
+  - `ONTOLOGIES_DIR`: diretório das ontologias (padrão `ontologies/`).
+  - `ONTOLOGIES`: lista separada por vírgula dos arquivos a carregar (padrão: todos os `.yaml` do diretório,
+    em ordem alfabética).
+- Erros claros: diretório inexistente quando configurado explicitamente, arquivo listado que não existe ou YAML
+  inválido geram um erro tipado (em `errors.py`) que a CLI mostra ao usuário ao iniciar.
+- `pyyaml` declarado como dependência direta no `pyproject.toml` (hoje só vem como transitiva).
+
+Fora do escopo:
+- Raciocínio formal sobre a ontologia (OWL, reasoners, consultas SPARQL).
+- Seleção dinâmica de ontologias por pergunta/thread.
+- Expor a ontologia como tool ou resource do MCP.
+
+## 5. Arquitetura inicial
+Python 3.12
+Langgraph (`create_agent` com `system_prompt`)
+PyYAML (`yaml.safe_load`)
+- `src/ai_agent_hospital/agent/ontology.py`: carregamento, validação e formatação das ontologias.
+- `src/ai_agent_hospital/agent/prompts.py`: função que monta o system prompt a partir do prompt base e das
+  ontologias.
+- `config.py`: novas configurações `ontologies_dir` e `ontologies`.
+- `bootstrap.py`/`create_hospital_agent`: passam o prompt montado ao `HospitalReActAgent`.
+- Tamanho do prompt: registrar no log o tamanho aproximado do prompt final, porque modelos locais pequenos
+  (ex.: llama3.2) têm contexto limitado.
+
+## 6. Critérios de aceite
+- O projeto DEVE ter o diretório `ontologies/` com a ontologia inicial em `.yaml`.
+- O system prompt do agente DEVE conter a ontologia carregada; sem ontologias, DEVE ser igual ao prompt atual.
+- Adicionar um novo `.yaml` em `ontologies/` DEVE incluí-lo no prompt sem mudança de código.
+- YAML inválido ou arquivo inexistente DEVE gerar erro tipado com o nome do arquivo, sem iniciar o agente.
+- DEVE haver testes (pytest) para carregamento, formatação, montagem do prompt e erros.
+- README e `.env.example` DEVEM documentar o diretório e as variáveis novas.
+
+## 7. Questões em aberto
+- Limite de tamanho: se a soma das ontologias ficar grande demais para o contexto do modelo local, avisar ou
+  falhar? Nesta versão, só registrar o tamanho no log.
