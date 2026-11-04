@@ -416,7 +416,7 @@
         "id": 11,
         "title": "Base das ontologias: diretório, dependência, configuração e erros",
         "description": "Criar a infraestrutura base para ontologias: diretório ontologies/ com dengue_sp.yaml, dependência pyyaml em pyproject.toml, campos de configuração em Settings (src/ai_agent_hospital/config.py), e erros tipados em errors.py para falhas de carregamento.",
-        "status": "in-progress",
+        "status": "done",
         "dependencies": [],
         "priority": "high",
         "details": "Esta tarefa agrupa toda a infraestrutura necessária para o sistema de ontologias:\n\n## 1. Estrutura de diretórios\n- Criar `ontologies/` na raiz do projeto\n- Mover `dengue_sp.yaml` para `ontologies/dengue_sp.yaml` via `git mv` (preserva histórico)\n\n## 2. Dependência pyyaml (subtask 11.1)\n- Adicionar `pyyaml>=6.0` ao array `dependencies` em `pyproject.toml` (linha 7)\n- Executar `uv sync` para atualizar `uv.lock`\n\n## 3. Configuração em Settings (subtask 11.2)\n- Arquivo: `src/ai_agent_hospital/config.py`\n- Adicionar constantes:\n  - `DEFAULT_ONTOLOGIES_DIR = \"ontologies\"`\n- Adicionar campos ao dataclass `Settings`:\n  - `ontologies_dir: str = DEFAULT_ONTOLOGIES_DIR`\n  - `ontologies: list[str] | None = None` (None = carregar todos os .yaml)\n- Atualizar `get_settings()` para ler:\n  - `ONTOLOGIES_DIR` -> `ontologies_dir`\n  - `ONTOLOGIES` -> lista separada por vírgulas ou None\n\n## 4. Erros tipados (subtask 11.3)\n- Arquivo: `src/ai_agent_hospital/errors.py`\n- Adicionar três classes que herdam de `AgentHospitalError`:\n  - `OntologyDirectoryNotFoundError(path: str)`\n  - `OntologyFileNotFoundError(filename: str, directory: str)`\n  - `OntologyParseError(filename: str, cause: Exception)`\n\nPseudo-code para mover o arquivo:\n```bash\nmkdir -p ontologies\ngit mv dengue_sp.yaml ontologies/dengue_sp.yaml\n```",
@@ -455,13 +455,13 @@
             "parentId": "undefined"
           }
         ],
-        "updatedAt": "2026-11-04T14:36:01.218Z"
+        "updatedAt": "2026-11-04T18:04:30.746Z"
       },
       {
         "id": 15,
         "title": "Carregamento das ontologias e montagem do prompt",
         "description": "Criar src/ai_agent_hospital/agent/ontology.py com funções para carregar, validar e formatar arquivos de ontologia do diretório configurado, além de estender agent/prompts.py para montar o prompt de sistema completo combinando o prompt base com as ontologias carregadas.",
-        "status": "pending",
+        "status": "in-progress",
         "dependencies": [
           "11"
         ],
@@ -474,7 +474,7 @@
             "title": "Implement prompt assembly with ontologies",
             "description": "Extend agent/prompts.py with a function that combines the base system prompt with loaded ontologies, formatting each ontology as a named section.",
             "dependencies": [],
-            "details": "Add to `src/ai_agent_hospital/agent/prompts.py`:\n\n1. `format_ontology_section(name: str, content: str) -> str`\n   - Formats a single ontology as a markdown section\n   - Returns `## Ontologia: {name}\\n\\n```yaml\\n{content}\\n```\\n`\n\n2. `build_system_prompt(ontologies: list[tuple[str, str]]) -> str`\n   - Takes list of (name, content) from load_ontologies\n   - If empty, returns HOSPITAL_SYSTEM_PROMPT unchanged\n   - Otherwise, appends formatted ontology sections\n   - Returns complete prompt string\n\nPseudo-code:\n```python\ndef format_ontology_section(name: str, content: str) -> str:\n    return f\"## Ontologia: {name}\\n\\n```yaml\\n{content}\\n```\\n\"\n\ndef build_system_prompt(ontologies: list[tuple[str, str]]) -> str:\n    if not ontologies:\n        return HOSPITAL_SYSTEM_PROMPT\n    \n    sections = [format_ontology_section(name, content) for name, content in ontologies]\n    return HOSPITAL_SYSTEM_PROMPT + \"\\n\" + \"\\n\".join(sections)\n```",
+            "details": "Add to `src/ai_agent_hospital/agent/prompts.py`:\n\n1. `format_ontology_section(name: str, content: str) -> str`\n   - Formats a single ontology as a markdown section\n   - Returns `## Ontologia: {name}\\n\\n```yaml\\n{content}\\n```\\n`\n\n2. `build_system_prompt(ontologies: list[tuple[str, str]]) -> str`\n   - Takes list of (name, content) from load_ontologies\n   - If empty, returns HOSPITAL_SYSTEM_PROMPT unchanged\n   - Otherwise, appends formatted ontology sections\n   - Returns complete prompt string\n\nPseudo-code:\n```python\ndef format_ontology_section(name: str, content: str) -> str:\n    return f\"## Ontologia: {name}\\n\\n```yaml\\n{content}\\n```\\n\"\n\ndef build_system_prompt(ontologies: list[tuple[str, str]]) -> str:\n    if not ontologies:\n        return HOSPITAL_SYSTEM_PROMPT\n    \n    sections = [format_ontology_section(name, content) for name, content in ontologies]\n    return HOSPITAL_SYSTEM_PROMPT + \"\\n\" + \"\\n\".join(sections)\n```\n<info added on 2026-11-04T18:20:14.727Z>\nImplementação concluída em `agent/ontology.py` e `agent/prompts.py`:\n\nOntology dataclass (frozen=True): campos name e content.\n\nload_ontology(path: Path) -> Ontology: lê o arquivo como UTF-8, valida com yaml.safe_load, levanta OntologyParseError para YAML inválido, documento que não é mapeamento, conteúdo vazio ou falha de decodificação UTF-8. O nome vem de metadados.nome quando existe e é não-vazio; caso contrário, usa path.stem.\n\nload_ontologies(directory: str | None, names: Sequence[str] | None) -> list[Ontology]: diretório padrão 'ontologies' relativo ao cwd (como o .env). Se o diretório padrão não existir e names não for passado, retorna lista vazia. Se directory for explicitamente informado e não existir, levanta OntologyDirectoryNotFoundError. Com names, carrega na ordem dada e levanta OntologyFileNotFoundError se algum arquivo faltar. Sem names, coleta todos os .yaml/.yml em ordem alfabética.\n\nbuild_system_prompt(ontologies) em prompts.py: sem ontologias, retorna HOSPITAL_SYSTEM_PROMPT inalterado. Com ontologias, acrescenta ONTOLOGIES_INTRO seguido de seções '### nome' com o YAML verbatim em bloco yaml.\n</info added on 2026-11-04T18:20:14.727Z>",
             "status": "pending",
             "testStrategy": "1. Unit test: build_system_prompt returns base prompt when ontologies empty\n2. Unit test: build_system_prompt appends ontology section with correct markdown formatting\n3. Unit test: multiple ontologies are all included in order\n4. Unit test: ontology name from metadados.nome appears in section header\n5. Unit test: YAML content is preserved verbatim inside code block",
             "parentId": "undefined"
@@ -486,12 +486,13 @@
             "dependencies": [
               1
             ],
-            "details": "Add to ontology.py or prompts.py:\n\n1. Estimate token count using character-based heuristic (chars / 4 for English, more conservative for mixed content)\n\n2. Add logging after prompt assembly:\n   - Log INFO level: prompt size in chars and estimated tokens\n   - Log WARNING if estimated tokens > 8000 (reasonable threshold for small models)\n\nPseudo-code:\n```python\nimport logging\n\nlogger = logging.getLogger(__name__)\n\nTOKEN_WARNING_THRESHOLD = 8000  # ~32KB of text\n\ndef estimate_tokens(text: str) -> int:\n    \"\"\"Conservative estimate: 1 token per 3 chars (accounts for non-English).\"\"\"\n    return len(text) // 3\n\ndef build_system_prompt(ontologies: list[tuple[str, str]]) -> str:\n    prompt = ...  # existing logic\n    \n    char_count = len(prompt)\n    token_estimate = estimate_tokens(prompt)\n    logger.info(\n        \"System prompt size: %d chars, ~%d tokens (estimated)\",\n        char_count,\n        token_estimate,\n    )\n    if token_estimate > TOKEN_WARNING_THRESHOLD:\n        logger.warning(\n            \"System prompt is large (~%d tokens). Models with small context \"\n            \"windows (e.g., llama3.2) may have issues. Consider reducing ontologies.\",\n            token_estimate,\n        )\n    return prompt\n```",
+            "details": "Add to ontology.py or prompts.py:\n\n1. Estimate token count using character-based heuristic (chars / 4 for English, more conservative for mixed content)\n\n2. Add logging after prompt assembly:\n   - Log INFO level: prompt size in chars and estimated tokens\n   - Log WARNING if estimated tokens > 8000 (reasonable threshold for small models)\n\nPseudo-code:\n```python\nimport logging\n\nlogger = logging.getLogger(__name__)\n\nTOKEN_WARNING_THRESHOLD = 8000  # ~32KB of text\n\ndef estimate_tokens(text: str) -> int:\n    \"\"\"Conservative estimate: 1 token per 3 chars (accounts for non-English).\"\"\"\n    return len(text) // 3\n\ndef build_system_prompt(ontologies: list[tuple[str, str]]) -> str:\n    prompt = ...  # existing logic\n    \n    char_count = len(prompt)\n    token_estimate = estimate_tokens(prompt)\n    logger.info(\n        \"System prompt size: %d chars, ~%d tokens (estimated)\",\n        char_count,\n        token_estimate,\n    )\n    if token_estimate > TOKEN_WARNING_THRESHOLD:\n        logger.warning(\n            \"System prompt is large (~%d tokens). Models with small context \"\n            \"windows (e.g., llama3.2) may have issues. Consider reducing ontologies.\",\n            token_estimate,\n        )\n    return prompt\n```\n<info added on 2026-11-04T18:20:37.322Z>\nUpdated heuristic based on real measurement with qwen2.5 (dengue ontology: 13560 chars = 4545 tokens, ~2.98 chars/token): CHARS_PER_TOKEN = 3 instead of 4. Dynamic threshold: warn when estimated tokens > num_ctx // 2 instead of fixed 8000. OLLAMA_NUM_CTX added to config.py (default 16384) and passed to ChatOllama via get_llm() - necessary because local Ollama without GPU defaults to 4096 context which would truncate prompts with ontologies. Implementation: estimate_tokens() and log_prompt_size(prompt, num_ctx) functions in src/ai_agent_hospital/agent/prompts.py (lines 62-88). The log_prompt_size call will be added in task 18 (bootstrap) when the agent assembles the prompt with settings.ollama_num_ctx.\n</info added on 2026-11-04T18:20:37.322Z>",
             "status": "pending",
             "testStrategy": "1. Unit test: estimate_tokens returns reasonable value for known input\n2. Unit test: INFO log is emitted with char and token count\n3. Unit test: WARNING log is emitted when prompt exceeds threshold\n4. Unit test: no WARNING when prompt is under threshold",
             "parentId": "undefined"
           }
-        ]
+        ],
+        "updatedAt": "2026-11-04T18:04:32.669Z"
       },
       {
         "id": 18,
@@ -522,13 +523,13 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-11-04T14:36:01.218Z",
+      "lastModified": "2026-11-04T18:04:32.670Z",
       "taskCount": 14,
-      "completedCount": 10,
+      "completedCount": 11,
       "tags": [
         "master"
       ],
-      "created": "2026-11-04T17:41:44.189Z",
+      "created": "2026-11-04T18:19:53.427Z",
       "description": "Tasks for master context"
     }
   }

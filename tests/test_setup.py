@@ -60,6 +60,7 @@ def no_dotenv(monkeypatch):
         "MCP_SERVER_ARGS",
         "ONTOLOGIES_DIR",
         "ONTOLOGIES",
+        "OLLAMA_NUM_CTX",
     ):
         monkeypatch.delenv(var, raising=False)
 
@@ -71,6 +72,7 @@ def test_settings_defaults(no_dotenv):
     assert settings.database_url == config.DEFAULT_DATABASE_URL
     assert settings.ontologies_dir is None
     assert settings.ontologies is None
+    assert settings.ollama_num_ctx == config.DEFAULT_OLLAMA_NUM_CTX
 
 
 def test_settings_env_override(no_dotenv, monkeypatch):
@@ -98,3 +100,8 @@ def test_settings_empty_ontologies_loads_all(no_dotenv, monkeypatch, value):
     settings = config.get_settings()
     assert settings.ontologies_dir is None
     assert settings.ontologies is None
+
+
+def test_settings_num_ctx_override(no_dotenv, monkeypatch):
+    monkeypatch.setenv("OLLAMA_NUM_CTX", "32768")
+    assert config.get_settings().ollama_num_ctx == 32768

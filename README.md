@@ -69,6 +69,7 @@ Lida de variáveis de ambiente e do `.env` (variáveis já definidas no ambiente
 |---|---|---|
 | `OLLAMA_MODEL` | `llama3.2` | Modelo do Ollama; precisa suportar tool calling (veja [LLM](#llm-ollama)) |
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Endereço do Ollama |
+| `OLLAMA_NUM_CTX` | `16384` | Contexto do modelo em tokens; o padrão do Ollama (4096) não cabe o prompt com a ontologia |
 | `DATABASE_URL` | `postgresql://postgres:postgres@localhost:5432/ai_agent_hospital` | PostgreSQL das threads; o padrão é o do `docker-compose.yml` |
 | `SMART_HOSPITALS_PATH` | (nenhum) | Clone do smart_hospitals; obrigatória para o `chat` e o `health` |
 | `MCP_SERVER_COMMAND` | `uv` | Executável que sobe o servidor MCP |

@@ -7,6 +7,8 @@ from dotenv import load_dotenv
 
 DEFAULT_OLLAMA_MODEL = "llama3.2"
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
+# O padrão do Ollama (4096 tokens sem GPU grande) não cabe o prompt com a ontologia de dengue.
+DEFAULT_OLLAMA_NUM_CTX = 16384
 DEFAULT_DATABASE_URL = "postgresql://postgres:postgres@localhost:5432/ai_agent_hospital"
 DEFAULT_MCP_SERVER_COMMAND = "uv"
 DEFAULT_MCP_SERVER_ARGS = "run --directory ${SMART_HOSPITALS_PATH} dengue-mcp"
@@ -27,6 +29,7 @@ class Settings:
     # não existir; um diretório definido de propósito precisa existir. Lista None = todos os .yaml.
     ontologies_dir: str | None = None
     ontologies: tuple[str, ...] | None = None
+    ollama_num_ctx: int = DEFAULT_OLLAMA_NUM_CTX
 
 
 def parse_ontologies(value: str | None) -> tuple[str, ...] | None:
@@ -47,4 +50,5 @@ def get_settings() -> Settings:
         mcp_server_args=os.getenv("MCP_SERVER_ARGS", DEFAULT_MCP_SERVER_ARGS),
         ontologies_dir=os.getenv("ONTOLOGIES_DIR") or None,
         ontologies=parse_ontologies(os.getenv("ONTOLOGIES")),
+        ollama_num_ctx=int(os.getenv("OLLAMA_NUM_CTX") or DEFAULT_OLLAMA_NUM_CTX),
     )

@@ -15,7 +15,7 @@ DEFAULT_TEMPERATURE = 0.1
 
 
 def get_llm(settings: Settings | None = None, **kwargs) -> ChatOllama:
-    """Cria o ChatOllama com OLLAMA_MODEL e OLLAMA_BASE_URL das configurações.
+    """Cria o ChatOllama com OLLAMA_MODEL, OLLAMA_BASE_URL e OLLAMA_NUM_CTX das configurações.
 
     `kwargs` vão para o ChatOllama e sobrescrevem os padrões (ex.: `temperature=0`).
     """
@@ -25,6 +25,8 @@ def get_llm(settings: Settings | None = None, **kwargs) -> ChatOllama:
         "model": settings.ollama_model,
         "base_url": settings.ollama_base_url,
         "temperature": DEFAULT_TEMPERATURE,
+        # Sem num_ctx, vale o contexto padrão do servidor Ollama, que corta prompts longos.
+        "num_ctx": settings.ollama_num_ctx,
     }
     return ChatOllama(**(params | kwargs))
 
