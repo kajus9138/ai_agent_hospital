@@ -81,6 +81,33 @@ Lida de variáveis de ambiente e do `.env` (variáveis já definidas no ambiente
 Deixe `MCP_SERVER_ARGS` comentado no `.env`, como no `.env.example`; o porquê e como o comando do
 servidor é montado estão em [docs/mcp-integration.md](docs/mcp-integration.md#variáveis-de-ambiente).
 
+## Ontologias
+
+Ontologias são arquivos YAML que dizem ao agente como interpretar os dados: conceitos, colunas,
+relações, regras e achados do domínio. A primeira, `ontologies/dengue_sp.yaml`, explica os valores
+que as tools do MCP de dengue devolvem (casos estimados, Rt, nível de alerta, semana epidemiológica).
+O YAML entra **inteiro** no prompt de sistema, depois do prompt do hospital, numa seção
+`## Ontologias`; o prompt diz que os valores atuais vêm sempre das tools, nunca da ontologia.
+
+- **Adicionar**: coloque o `.yaml` (ou `.yml`) em `ontologies/`. Sem `ONTOLOGIES`, todos entram, em
+  ordem alfabética, sem mudar código. O nome no prompt é `metadados.nome` (ou o nome do arquivo).
+- **Escolher**: `ONTOLOGIES=dengue_sp.yaml,outra.yaml` carrega só esses, nessa ordem. Para ler de outro
+  lugar, `ONTOLOGIES_DIR`.
+- **Quando**: só no `chat`, ao abrir, antes de checar o Ollama. `threads`, `history`, `fork` e
+  `delete` não carregam ontologias. Sem o diretório `ontologies/`, o prompt é o de antes.
+- **Erros**: um diretório definido em `ONTOLOGIES_DIR` que não existe, um arquivo listado em
+  `ONTOLOGIES` que não existe ou um YAML inválido impedem o `chat` de abrir, com o nome do arquivo na
+  mensagem (veja [Erros e health check](#erros-e-health-check)).
+
+**Tamanho e contexto.** A ontologia de dengue tem ~4,5 mil tokens. O Ollama sem GPU usa 4096 tokens
+de contexto por padrão e corta o que passar disso **sem erro**; por isso o projeto pede
+`OLLAMA_NUM_CTX=16384`. Se as ontologias somadas passarem de metade do contexto, o `chat` mostra um
+aviso no terminal: aumente `OLLAMA_NUM_CTX` ou carregue menos ontologias.
+
+**Latência.** O prompt maior pesa em CPU: com `qwen2.5`, a primeira resposta levou ~7 min (recarga do
+modelo com o contexto novo + processamento do prompt) e as seguintes, de 30 s a ~2,5 min. Para
+apresentar, veja [DEMO.md](DEMO.md#antes-de-apresentar).
+
 ## Exemplos de perguntas
 
 Cada pergunta leva o agente a uma das tools do servidor MCP (conversas completas no
@@ -121,7 +148,8 @@ async with create_pool() as pool:  # usa DATABASE_URL
 
 O modelo vem de `OLLAMA_MODEL` (padrão `llama3.2`) servido em `OLLAMA_BASE_URL`. `get_llm()` devolve
 um `ChatOllama` (chat model do LangChain, usável no LangGraph) com temperatura 0.1, para um
-raciocínio mais consistente. `check_ollama_health()` confirma que o Ollama responde **e** que o
+raciocínio mais consistente, e contexto de `OLLAMA_NUM_CTX` tokens (padrão 16384; veja
+[Ontologias](#ontologias)). `check_ollama_health()` confirma que o Ollama responde **e** que o
 modelo configurado já foi baixado.
 
 Modelos recomendados para ReAct (precisam de suporte a tool calling): `llama3.2` (3B, leve),
@@ -169,15 +197,22 @@ async with DengueMCPClient.from_settings() as client:  # 3 tentativas, com backo
 `create_react_agent` do LangGraph), o prompt de sistema em `agent/prompts.py` e as tools descobertas
 no servidor MCP. Cada conversa é um `thread_id`; com o checkpointer do PostgreSQL
 (`open_checkpointer()`, que cria suas tabelas na primeira vez), o histórico sobrevive a reinícios.
+Sem `system_prompt`, o agente usa só o prompt do hospital; `load_system_prompt()` soma as
+[ontologias](#ontologias), como faz o `chat`.
 
 ```python
 from ai_agent_hospital.agent.checkpointer import open_checkpointer
 from ai_agent_hospital.agent.llm import get_llm
 from ai_agent_hospital.agent.react_agent import create_hospital_agent
+from ai_agent_hospital.bootstrap import load_system_prompt
+from ai_agent_hospital.config import get_settings
 from ai_agent_hospital.mcp_client import DengueMCPClient
 
+settings = get_settings()
 async with DengueMCPClient.from_settings() as client, open_checkpointer() as checkpointer:
-    agent = await create_hospital_agent(get_llm(), client, checkpointer)
+    agent = await create_hospital_agent(
+        get_llm(settings), client, checkpointer, system_prompt=load_system_prompt(settings)
+    )
     print(await agent.invoke("A dengue está em alta ou queda?", thread_id="gestor-1"))
     async for event in agent.stream("E comparado a 2024?", thread_id="gestor-1"):
         ...  # eventos do astream_events (v2): tokens do modelo, início/fim de tools
@@ -233,8 +268,9 @@ Para voltar a um ponto anterior, use o `fork` (o número vem do `history`).
 
 Se algo não sobe, o comando sai com código 1 e uma mensagem do que conferir. Os erros têm a base
 `AgentHospitalError` (`errors.py`): `DatabaseConnectionError`, `OllamaConnectionError`,
-`MCPConnectionError` e `ToolExecutionError` (tool que falha fora do protocolo, ex.: o servidor MCP
-caiu). Falhas transitórias têm novas tentativas com backoff exponencial: cada chamada do modelo
+`MCPConnectionError`, `ToolExecutionError` (tool que falha fora do protocolo, ex.: o servidor MCP
+caiu) e `OntologyError` (`OntologyDirectoryNotFoundError`, `OntologyFileNotFoundError`,
+`OntologyParseError`; veja [Ontologias](#ontologias)). Falhas transitórias têm novas tentativas com backoff exponencial: cada chamada do modelo
 (conexão, timeout, 502/503/504; esgotadas, viram `OllamaConnectionError`), a conexão com o banco
 (o próprio pool) e a do servidor MCP. O `health` verifica os três serviços em paralelo e sai com 1 se algum estiver fora.
 SIGTERM (ex.: `kill`) fecha pools e o servidor MCP antes de sair (código 143).
@@ -243,7 +279,7 @@ SIGTERM (ex.: `kill`) fecha pools e o servidor MCP antes de sair (código 143).
 
 ```
 src/ai_agent_hospital/
-  agent/        # lógica do agente ReAct
+  agent/        # lógica do agente ReAct (ontology.py: carrega as ontologias do prompt)
   db/           # persistência das threads no PostgreSQL
   mcp_client/   # comunicação com o MCP local (stdio)
   config.py     # configurações via variáveis de ambiente / .env
@@ -252,6 +288,7 @@ src/ai_agent_hospital/
   health.py     # health check dos serviços
   cli.py        # CLI (comando ai-agent-hospital)
   main.py       # ponto de entrada que chama a CLI
+ontologies/     # ontologias (YAML) somadas ao prompt do agente
 tests/
 docs/           # arquitetura, integração MCP e critérios de aceite
 DEMO.md         # roteiro de demonstração
