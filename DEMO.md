@@ -8,6 +8,10 @@ em 2026-10-27 com o modelo `qwen2.5` e o snapshot de referência **2026-10-04 (S
 O texto do LLM muda de uma execução para outra (e com outro snapshot, os números também). O que se
 repete é o comportamento: qual tool o agente consulta e se ele se mantém nos dados.
 
+As transcrições são de antes da [ontologia](README.md#ontologias) entrar no prompt (2026-11-04). Com
+ela, o texto das respostas pode mudar; nos testes ponta a ponta com `qwen2.5`, o comportamento foi o
+mesmo (mesmas tools, mesma falha conhecida da Zona Leste).
+
 ## Antes de apresentar
 
 ```bash
@@ -17,9 +21,11 @@ uv run ai-agent-hospital health           # ollama, database e mcp: ok
 uv run ai-agent-hospital chat             # conversa nova
 ```
 
-- Rode uma pergunta de aquecimento antes do público entrar: a primeira resposta carrega o modelo na
-  memória e pode levar bem mais tempo.
-- Cada resposta leva de 30 s a 2 min numa máquina sem GPU dedicada. Use a espera para narrar as linhas
+- **Rode uma pergunta de aquecimento antes do público entrar.** A primeira resposta carrega o modelo
+  com o contexto de `OLLAMA_NUM_CTX` e processa o prompt com a ontologia (~5 mil tokens): numa
+  máquina sem GPU dedicada, levou ~7 min. Depois disso o Ollama reaproveita o prompt já processado.
+  Não troque de modelo nem de `OLLAMA_NUM_CTX` depois do aquecimento, ou ele recomeça.
+- Cada resposta seguinte leva de 30 s a ~2,5 min sem GPU. Use a espera para narrar as linhas
   `→ consultando ...`: é o agente decidindo que dado buscar.
 - Confira a data do snapshot: a resposta de `situacao_atual` traz `data_referencia`. Para dados mais
   novos, veja [Atualizar os dados](docs/mcp-integration.md#atualizar-os-dados).

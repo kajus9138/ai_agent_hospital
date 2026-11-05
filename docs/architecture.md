@@ -12,6 +12,8 @@ flowchart LR
 
     subgraph repo["ai_agent_hospital (este repositório)"]
         cli["CLI<br/>cli.py"] --> boot["bootstrap.open_session"]
+        boot --> onto["Ontologias<br/>agent/ontology.py"]
+        onto -->|"YAML"| ontofiles[("ontologies/*.yaml")]
         boot --> tm["ThreadManager<br/>agent/thread_manager.py"]
         tm --> agent["HospitalReActAgent<br/>agent/react_agent.py"]
         tm --> repoDb["ThreadRepository<br/>db/repository.py"]
@@ -34,7 +36,8 @@ flowchart LR
 | CLI | `cli.py` | Comandos `chat`, `threads`, `history`, `fork`, `delete`, `health`; mostra a resposta em streaming |
 | Montagem | `bootstrap.py` | `open_session` abre banco, checkpointer, Ollama e MCP e entrega um `ThreadManager` |
 | Agente | `agent/react_agent.py` | Grafo ReAct (`langchain.agents.create_agent`) com o prompt de `agent/prompts.py` e middlewares de erro |
-| LLM | `agent/llm.py` | `ChatOllama` (temperatura 0.1) e checagem de saúde do Ollama |
+| Ontologias | `agent/ontology.py`, `ontologies/` | Carrega e valida os YAML que `build_system_prompt` soma ao prompt; veja o [README](../README.md#ontologias) |
+| LLM | `agent/llm.py` | `ChatOllama` (temperatura 0.1, contexto `OLLAMA_NUM_CTX`) e checagem de saúde do Ollama |
 | Threads | `agent/thread_manager.py` | Mantém o catálogo de threads e o estado do grafo em acordo |
 | Persistência | `db/`, `agent/checkpointer.py` | Pool psycopg 3, schema próprio e o `AsyncPostgresSaver` do LangGraph |
 | Cliente MCP | `mcp_client/` | Sobe o servidor via stdio e converte as tools para o LangChain |
@@ -47,7 +50,11 @@ o agente só conhece o comando para iniciá-lo. Detalhes em [mcp-integration.md]
 
 `bootstrap.open_session(with_tools=True)` (usado pelo `chat`) abre os recursos nesta ordem:
 
-1. **Ollama**: responde e tem o modelo baixado? É a checagem mais barata, então vem primeiro.
+0. **Ontologias**: carrega e valida os YAML e monta o prompt (`load_system_prompt`), registrando o
+   tamanho no log. Vem antes de tudo porque é configuração local: um erro aqui aparece sem esperar
+   rede nem banco.
+1. **Ollama**: responde e tem o modelo baixado? É a checagem mais barata dos serviços, então vem
+   primeiro.
 2. **PostgreSQL**: pool do repository e `init_schema` (idempotente).
 3. **Checkpointer**: pool próprio (exige autocommit e `dict_row`) e `setup()` das tabelas do LangGraph.
 4. **Servidor MCP**: sobe o subprocesso, faz o handshake e descobre as tools.
@@ -55,8 +62,8 @@ o agente só conhece o comando para iniciá-lo. Detalhes em [mcp-integration.md]
 
 Tudo fica num `AsyncExitStack` e fecha na ordem inversa, inclusive no Ctrl+C e no SIGTERM. Abertura e
 fechamento acontecem na mesma task asyncio, exigência do transporte stdio do MCP. Os comandos que não
-conversam (`threads`, `history`, `fork`, `delete`) usam `with_tools=False`: só o banco, sem Ollama
-nem servidor MCP.
+conversam (`threads`, `history`, `fork`, `delete`) usam `with_tools=False`: só o banco, sem Ollama,
+servidor MCP nem ontologias (um YAML quebrado não impede ler ou apagar threads).
 
 ## O loop ReAct
 
@@ -134,6 +141,7 @@ a próxima pergunta pode funcionar (com o servidor MCP fora, não vai: saia e re
 | `DatabaseConnectionError` | PostgreSQL inacessível na abertura do pool ou do checkpointer |
 | `MCPConnectionError` | Configuração inválida ou servidor que não sobe |
 | `ToolExecutionError` | Tool que falha fora do protocolo (ex.: o servidor caiu) |
+| `OntologyError` | Diretório de `ONTOLOGIES_DIR` ou arquivo de `ONTOLOGIES` que não existe, ou YAML inválido (`OntologyDirectoryNotFoundError`, `OntologyFileNotFoundError`, `OntologyParseError`) |
 
 Novas tentativas:
 
