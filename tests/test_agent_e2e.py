@@ -18,6 +18,7 @@ from langgraph.checkpoint.memory import InMemorySaver
 from ai_agent_hospital import config
 from ai_agent_hospital.agent.llm import check_ollama_health, get_llm
 from ai_agent_hospital.agent.react_agent import HospitalReActAgent, create_hospital_agent
+from ai_agent_hospital.bootstrap import load_system_prompt
 from ai_agent_hospital.mcp_client import DengueMCPClient, load_langchain_tools
 
 pytestmark = [pytest.mark.ollama, pytest.mark.dengue_mcp]
@@ -55,7 +56,7 @@ async def ask(settings: config.Settings, question: str) -> tuple[str, list[str]]
     thread_id = str(uuid.uuid4())
     async with mcp_client(settings) as client:
         agent: HospitalReActAgent = await create_hospital_agent(
-            get_llm(settings, temperature=0), client, InMemorySaver()
+            get_llm(settings, temperature=0), client, InMemorySaver(), load_system_prompt(settings)
         )
         answer = await agent.invoke(question, thread_id)
         state = await agent.graph.aget_state({"configurable": {"thread_id": thread_id}})

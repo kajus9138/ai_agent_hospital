@@ -7,6 +7,8 @@ import psycopg
 
 from ai_agent_hospital.agent.checkpointer import open_checkpointer
 from ai_agent_hospital.agent.llm import check_ollama_health, get_llm
+from ai_agent_hospital.agent.ontology import load_ontologies
+from ai_agent_hospital.agent.prompts import build_system_prompt, log_prompt_size
 from ai_agent_hospital.agent.react_agent import HospitalReActAgent, create_hospital_agent
 from ai_agent_hospital.agent.thread_manager import ThreadManager
 from ai_agent_hospital.config import Settings, get_settings
@@ -22,6 +24,17 @@ from ai_agent_hospital.mcp_client import DengueMCPClient
 DB_CONNECT_TIMEOUT = 10.0
 
 
+def load_system_prompt(settings: Settings) -> str:
+    """Prompt do hospital com as ontologias configuradas; registra o tamanho dele no log.
+
+    Levanta OntologyError se o diretório, um arquivo listado ou um YAML estiver errado.
+    """
+    ontologies = load_ontologies(settings.ontologies_dir, settings.ontologies)
+    prompt = build_system_prompt(ontologies)
+    log_prompt_size(prompt, settings.ollama_num_ctx)
+    return prompt
+
+
 @asynccontextmanager
 async def open_session(
     settings: Settings | None = None, *, with_tools: bool
@@ -32,9 +45,12 @@ async def open_session(
     bifurcar e apagar threads. Tudo é aberto e fechado nesta task (exigência do stdio do MCP), na
     ordem inversa da abertura, inclusive se a task for cancelada (Ctrl+C, SIGTERM).
 
-    Levanta DatabaseConnectionError, OllamaConnectionError ou MCPConnectionError.
+    Levanta OntologyError, DatabaseConnectionError, OllamaConnectionError ou MCPConnectionError.
     """
     settings = settings or get_settings()
+    # Só o chat usa o prompt; sem tools, uma ontologia com erro não impede ler ou apagar threads.
+    # Primeiro de tudo: é erro de configuração local, sem rede.
+    system_prompt = load_system_prompt(settings) if with_tools else None
     # Antes do banco: sem Ollama o chat não serve, e esta checagem é a mais barata.
     if with_tools and not await check_ollama_health(settings):
         raise OllamaConnectionError(
@@ -65,7 +81,7 @@ async def open_session(
                 client = await stack.enter_async_context(DengueMCPClient.from_settings(settings))
             except ValueError as exc:  # MCP_SERVER_ARGS malformado (shlex)
                 raise MCPConnectionError(f"MCP_SERVER_ARGS inválido: {exc}") from exc
-            agent = await create_hospital_agent(llm, client, checkpointer)
+            agent = await create_hospital_agent(llm, client, checkpointer, system_prompt)
         else:
             agent = HospitalReActAgent(llm, [], checkpointer)
         yield ThreadManager(agent, ThreadRepository(pool))

@@ -146,7 +146,8 @@ async def create_hospital_agent(
     llm: BaseChatModel,
     mcp_client: DengueMCPClient,
     checkpointer: Checkpointer = None,
+    system_prompt: str = HOSPITAL_SYSTEM_PROMPT,
 ) -> HospitalReActAgent:
     """Agente com as tools descobertas no servidor MCP (o cliente precisa estar conectado)."""
     tools = await load_langchain_tools(mcp_client)
-    return HospitalReActAgent(llm, tools, checkpointer)
+    return HospitalReActAgent(llm, tools, checkpointer, system_prompt)

@@ -13,15 +13,17 @@ from pathlib import Path
 
 import pytest
 import typer
-from langchain_core.messages import AIMessage
+from langchain_core.messages import AIMessage, SystemMessage
 from test_react_agent import scripted
 
 from ai_agent_hospital import bootstrap, cli
+from ai_agent_hospital.agent.prompts import HOSPITAL_SYSTEM_PROMPT
 from ai_agent_hospital.config import Settings
 from ai_agent_hospital.errors import (
     DatabaseConnectionError,
     MCPConnectionError,
     OllamaConnectionError,
+    OntologyDirectoryNotFoundError,
 )
 from ai_agent_hospital.mcp_client import DengueMCPClient
 
@@ -72,11 +74,45 @@ async def test_end_to_end_conversation(schema_url, fake_ollama):
     assert [m.role for m in history] == ["user", "assistant", "tool", "assistant"]
     # A tool rodou de verdade no servidor MCP (stdio), não no LLM falso.
     assert "1250" in history[2].content
+    # Os testes rodam da raiz do repo: o padrão `ontologies/` entra no prompt.
+    system = fake_ollama.calls[0][0]
+    assert isinstance(system, SystemMessage)
+    assert "### ontologia-dengue-sp" in system.text
 
 
 async def test_unreachable_database_raises_database_error(short_db_timeout):
     with pytest.raises(DatabaseConnectionError, match="DATABASE_URL"):
         async with bootstrap.open_session(make_settings(UNREACHABLE_DB), with_tools=False):
+            pass
+
+
+def test_load_system_prompt_with_ontologies(tmp_path, caplog):
+    (tmp_path / "leitos.yaml").write_text("metadados: {nome: leitos}\n", encoding="utf-8")
+    caplog.set_level("INFO", logger="ai_agent_hospital.agent.prompts")
+    prompt = bootstrap.load_system_prompt(make_settings("", ontologies_dir=str(tmp_path)))
+    assert prompt.startswith(HOSPITAL_SYSTEM_PROMPT)
+    assert "### leitos" in prompt
+    assert "contexto do modelo: 16384" in caplog.text
+
+
+def test_load_system_prompt_without_ontologies(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)  # sem `ontologies/` no diretório atual
+    assert bootstrap.load_system_prompt(make_settings("")) == HOSPITAL_SYSTEM_PROMPT
+
+
+async def test_ontology_error_fails_before_ollama(tmp_path):
+    settings = make_settings(UNREACHABLE_DB, ontologies_dir=str(tmp_path / "nao-existe"))
+    # Ollama em 127.0.0.1:1: se ele fosse checado antes, o erro seria OllamaConnectionError.
+    with pytest.raises(OntologyDirectoryNotFoundError, match="ONTOLOGIES_DIR"):
+        async with bootstrap.open_session(settings, with_tools=True):
+            pass
+
+
+async def test_ontology_ignored_without_tools(tmp_path, short_db_timeout):
+    settings = make_settings(UNREACHABLE_DB, ontologies_dir=str(tmp_path / "nao-existe"))
+    # Sem tools a ontologia não é carregada: o primeiro erro é o do banco.
+    with pytest.raises(DatabaseConnectionError):
+        async with bootstrap.open_session(settings, with_tools=False):
             pass
 
 

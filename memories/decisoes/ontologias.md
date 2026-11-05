@@ -10,7 +10,7 @@ tags:
 
 # Ontologias no prompt do agente
 
-Decisões tomadas nas tarefas 11 (base) e 15 (carregamento e prompt), em 2026-11-04. PRD em
+Decisões tomadas nas tarefas 11 (base), 15 (carregamento e prompt) e 18 (bootstrap), em 2026-11-04. PRD em
 `.taskmaster/docs/prd-ontologias.txt`; backlog nas tarefas 11, 15, 18 e 20.
 
 ## Contexto
@@ -36,6 +36,12 @@ código.
 - [alternativa-descartada] Documentar só `OLLAMA_CONTEXT_LENGTH` no `ollama serve`: depende de quem sobe o servidor #ollama
 - [decisao] `log_prompt_size`: estimativa `len // 3`; WARNING acima de metade do `num_ctx` (o resto é para tools, histórico e resposta), em vez de um limite fixo de 8000 tokens #prompt
 - [licao] Não editar arquivos com a suíte rodando: o `tests/test_docs.py` lê o fonte do `config.py` com `inspect.getsource`, que pega as linhas erradas se o arquivo mudou depois do import #testes
+- [decisao] `bootstrap.load_system_prompt(settings)` carrega, monta e loga o tamanho; `open_session` só chama com `with_tools=True` (chat), e antes da checagem do Ollama: erro de configuração local aparece primeiro, sem rede #bootstrap
+- [decisao] Sem tools (threads, history, fork, delete) a ontologia não é carregada: um YAML quebrado não impede ler ou apagar threads #bootstrap
+- [decisao] Ontologia mantida inteira no prompt, mesmo com o custo de latência (decisão do usuário); filtrar por seção fica para depois, se a latência pesar. Sem `achados` o prompt cairia ~37% #ontologia
+- [licao] Com a ontologia e `num_ctx` 16k no qwen2.5 em CPU, os e2e foram de ~4,6 para ~13 min: 1ª pergunta 413 s (recarga do modelo com o contexto novo + ~5k tokens de prompt), seguintes 30-143 s; resultados iguais (Zona Leste segue xfail) #ollama
+- [licao] O hook `run-tests` do pre-commit roda a suíte inteira (agora ~13 min com Ollama no ar): agrupar commits, ou rodar com o Ollama parado para os e2e serem pulados #git
+- [licao] A CLI não configura `logging`: o WARNING de tamanho aparece no terminal (lastResort do Python), o INFO não #cli
 
 ## Relations
 - part_of [[ai_agent_hospital]]
